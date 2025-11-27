@@ -1,0 +1,42 @@
+# Dependencias
+node_modules
+npm-debug.log
+
+# Build
+dist
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+coverage
+.nyc_output
+
+# Environment files (se pasan como variables de entorno)
+.env
+.env.*
+!.env.example
+
+# Documentación
+README.md
+SETUP.md
+*.md
+
+# Logs
+logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporal
+tmp
+temp

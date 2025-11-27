@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # ==================== APLICACIÓN NESTJS ====================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: dms2
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      # Configuración general
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 8080
+      
+      # PostgreSQL (dentro del contenedor Docker)
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-dms2_database}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      
+      # SQL Server SAP (conexión EXTERNA - IP de tu red)
+      MSSQL_HOST: ${MSSQL_HOST}
+      MSSQL_PORT: ${MSSQL_PORT:-1433}
+      MSSQL_USERNAME: ${MSSQL_USERNAME}
+      MSSQL_PASSWORD: ${MSSQL_PASSWORD}
+      MSSQL_DATABASE: ${MSSQL_DATABASE:-integrador_icorebiz}
+      MSSQL_ENCRYPT: ${MSSQL_ENCRYPT:-false}
+      MSSQL_TRUST_SERVER_CERTIFICATE: ${MSSQL_TRUST_SERVER_CERTIFICATE:-true}
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
+      
+      # WordPress
+      WP_REST_API_ES: ${WP_REST_API_ES}
+      WP_REST_API_DE: ${WP_REST_API_DE}
+      WP_USERNAME: ${WP_USERNAME}
+      WP_PASSWORD: ${WP_PASSWORD}
+      
+      # WebUntis
+      WEB_UNTIS_URL: ${WEB_UNTIS_URL}
+      WEB_UNTIS_SCHOOL: ${WEB_UNTIS_SCHOOL}
+      WEB_UNTIS_USERNAME: ${WEB_UNTIS_USERNAME}
+      WEB_UNTIS_PASSWORD: ${WEB_UNTIS_PASSWORD}
+      WEB_UNTIS_RECOVERY_DAYS: ${WEB_UNTIS_RECOVERY_DAYS}
+      
+      # Versiones APP
+      APK_VERSION: ${APK_VERSION}
+      IPA_VERSION: ${IPA_VERSION}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dms2_network
+    # Extra hosts para acceder a la red local (SQL Server SAP)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ==================== POSTGRESQL ====================
+  postgres:
+    image: postgres:15-alpine
+    container_name: dms2_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_DATABASE:-dms2_database}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-dms2_database}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dms2_network
+
+networks:
+  dms2_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

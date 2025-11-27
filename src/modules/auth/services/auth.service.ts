@@ -109,11 +109,20 @@ export class AuthService {
             await this.updateDevice(entityId, entityType, modelId, modelType, deviceToken);
         }
 
+        // Generar el token JWT
+        const apiToken = this.generateToken(user);
+
         this.logger.log("=======Fin sendLoginResponse========");
 
+        // Respuesta estructurada para la app móvil
+        // La app espera: id, name, userType, entityType, entityId, apiToken
         return {
-            ...user,
-            token: this.generateToken(user),
+            id: user.id,
+            name: user.name,
+            userType: user.user_type,
+            entityType: entityType,
+            entityId: entityId,
+            apiToken: apiToken,
         };
     }
 
