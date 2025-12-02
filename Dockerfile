@@ -35,16 +35,21 @@ RUN npm ci --only=production && npm cache clean --force
 # Copiar archivos compilados desde builder
 COPY --from=builder /app/dist ./dist
 
+# Copiar script de entrada
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 # Variables de entorno por defecto
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV RUN_MIGRATIONS=false
 
 # Puerto expuesto
 EXPOSE 8080
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Usuario no-root para seguridad
 RUN addgroup -g 1001 -S nodejs && \
@@ -53,5 +58,5 @@ RUN addgroup -g 1001 -S nodejs && \
 
 USER nestjs
 
-# Comando de inicio
-CMD ["node", "dist/main.js"]
+# Comando de inicio con script
+ENTRYPOINT ["./docker-entrypoint.sh"]

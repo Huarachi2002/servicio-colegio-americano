@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    container_name: dms2
+    container_name: dms2_app
     restart: unless-stopped
     ports:
       - "${PORT:-8080}:8080"
@@ -15,6 +15,9 @@ services:
       # Configuración general
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 8080
+      
+      # Migraciones automáticas (true para primera ejecución)
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
       
       # PostgreSQL (dentro del contenedor Docker)
       DB_HOST: postgres
@@ -29,7 +32,7 @@ services:
       MSSQL_USERNAME: ${MSSQL_USERNAME}
       MSSQL_PASSWORD: ${MSSQL_PASSWORD}
       MSSQL_DATABASE: ${MSSQL_DATABASE:-integrador_icorebiz}
-      MSSQL_ENCRYPT: ${MSSQL_ENCRYPT:-false}
+      MSSQL_ENCRYPT: ${MSSQL_ENCRYPT:-true}
       MSSQL_TRUST_SERVER_CERTIFICATE: ${MSSQL_TRUST_SERVER_CERTIFICATE:-true}
       
       # JWT
@@ -68,14 +71,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_DATABASE:-dms2_database}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-123}
+      POSTGRES_DB: ${DB_DATABASE:-db_ca}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "5433:5432"  # Puerto 5433 externo para no conflictuar con PostgreSQL local
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-dms2_database}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-db_ca}"]
       interval: 10s
       timeout: 5s
       retries: 5

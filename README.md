@@ -83,3 +83,17 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+
+## Pasos para realizar la migracion de las tablas para produccion.
+
+# Levantar solo PostgreSQL en Docker
+docker-compose up -d postgres
+
+# Generar la migracion inicial (antes de Docker)
+npm run migration:generate src/database/migrations/InitialMigration
+
+# Cambiar el valor de RUN_MIGRATIONS=True en .env
+
+# Ahora sí puedes construir toda la aplicación
+docker-compose up --build
