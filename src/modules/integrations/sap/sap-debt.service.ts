@@ -4,6 +4,10 @@ import {
     DebtConsultationResponse,
     DebtDetail,
     InvoiceData,
+    PendingDebtConsultationResponse,
+    PendingDebtDetail,
+    ConsultaDeudaXmlData,
+    ConsultaDeudaPendienteXmlData,
 } from './interfaces/debt-consultation.interface';
 
 /**
@@ -16,7 +20,8 @@ export class SapDebtService {
     constructor(private readonly sapService: SapService) { }
 
     /**
-     * Consultar deuda del estudiante
+     * Consultar deuda del estudiante (SP_A_ConsultaDeudaLaravel)
+     * Retorna una deuda específica con datos de facturación
      */
     async getDebtConsultation(
         studentErpCode: string,
@@ -24,10 +29,9 @@ export class SapDebtService {
         try {
             this.logger.log(`Consultando deuda para estudiante: ${studentErpCode}`);
 
-            // Ejecutar stored procedure
-            const result = await this.sapService.executeStoredProcedure(
-                // 'SP_B_ConsultaDeudaLaravel',
-                'SP_B_ConsultaDeuda',
+            // Ejecutar stored procedure SP_A_ConsultaDeudaLaravel
+            const result = await this.sapService.executeStoredProcedure<ConsultaDeudaXmlData>(
+                'SP_ConsultaDeudaLaravel',
                 studentErpCode,
             );
 
@@ -36,7 +40,7 @@ export class SapDebtService {
                 return this.getEmptyDebtResponse('No se encontró información');
             }
 
-            // Transformar respuesta
+            // Transformar respuesta XML a interface tipada
             return this.transformDebtResponse(result);
         } catch (error) {
             this.logger.error(
@@ -48,21 +52,27 @@ export class SapDebtService {
     }
 
     /**
-     * Consultar deuda pendiente (diferente SP)
+     * Consultar deuda pendiente (SP_B_ConsultaDeudaPendiente)
+     * Retorna lista completa de deudas pendientes del estudiante
      */
     async getPendingDebtConsultation(
         studentErpCode: string,
-    ): Promise<DebtConsultationResponse | null> {
+    ): Promise<PendingDebtConsultationResponse | null> {
         try {
-            const result = await this.sapService.executeStoredProcedure(
+            this.logger.log(`Consultando deuda pendiente para estudiante: ${studentErpCode}`);
+
+            // Ejecutar stored procedure SP_B_ConsultaDeudaPendiente
+            const result = await this.sapService.executeStoredProcedure<ConsultaDeudaPendienteXmlData>(
                 'SP_B_ConsultaDeudaPendiente',
                 studentErpCode,
             );
 
             if (!result) {
+                this.logger.warn(`No hay deuda pendiente para ${studentErpCode}`);
                 return null;
             }
 
+            // Transformar respuesta XML a interface tipada
             return this.transformPendingDebtResponse(result);
         } catch (error) {
             this.logger.error(`Error obteniendo deuda pendiente: ${error.message}`);
@@ -71,77 +81,76 @@ export class SapDebtService {
     }
 
     /**
-     * Transformar respuesta XML parseada a TypeScript
+     * Transformar respuesta XML de SP_A_ConsultaDeudaLaravel
+     * @param xmlData Datos crudos del XML parseado
+     * @returns DebtConsultationResponse tipada
      */
-    private transformDebtResponse(xmlData: any): DebtConsultationResponse {
+    private transformDebtResponse(xmlData: ConsultaDeudaXmlData): DebtConsultationResponse {
         return {
             idProceso: String(xmlData.idProceso || 'False'),
             MensajeProceso: String(xmlData.MensajeProceso || ''),
             idTransaccion: String(
                 xmlData.IdTransaccion || xmlData.idTransaccion || '0',
             ),
+            parentCode: String(xmlData.parentCode || ''),
             NombreDeudor: String(xmlData.NombreDeudor || ''),
             MonedaDelCobro: xmlData.MonedaDelCobro === 'U' ? 'U' : 'B',
             MontoDelCobro: String(xmlData.MontoDelCobro || '0'),
-            TipoCambio: String(xmlData.TipoCambio || '6.96'),
+            TipoCambio: xmlData.TipoCambio ? String(xmlData.TipoCambio) : undefined,
             DetalleDelCobro: {
                 ConceptoPago: String(xmlData.DetalleDelCobro?.ConceptoPago || ''),
                 PeriodoPago: String(xmlData.DetalleDelCobro?.PeriodoPago || ''),
                 MultaPago: String(xmlData.DetalleDelCobro?.MultaPago || '0'),
                 DescuentoPago: String(xmlData.DetalleDelCobro?.DescuentoPago || '0'),
                 MontoPago: String(xmlData.DetalleDelCobro?.MontoPago || '0'),
-                Facturable: String(xmlData.DetalleDelCobro?.Facturable || '0'),
+                Facturable: String(xmlData.DetalleDelCobro?.Facturable || 'N'),
             },
             DatosFactura: {
-                IdGeneraFact: String(xmlData.DatosFactura?.IdGeneraFact || '0'),
+                IdGeneraFact: String(xmlData.DatosFactura?.IdGeneraFact || 'N'),
                 NITCIFact: String(xmlData.DatosFactura?.NITCIFact || ''),
                 NombreFact: String(xmlData.DatosFactura?.NombreFact || ''),
-                ModDatosFact: String(xmlData.DatosFactura?.ModDatosFact || '0'),
+                ModDatosFact: String(xmlData.DatosFactura?.ModDatosFact || 'N'),
                 DocumentType: String(xmlData.DatosFactura?.DocumentType || '0'),
-                Complement: String(xmlData.DatosFactura?.Complement || null),
+                Complement: xmlData.DatosFactura?.Complement || null,
             },
         };
     }
 
     /**
-     * Transformar respuesta de deuda pendiente (puede venir con array)
+     * Transformar respuesta XML de SP_B_ConsultaDeudaPendiente
+     * El XML puede tener múltiples nodos DetalleDeuda que el parser
+     * puede devolver como objeto (si hay uno) o array (si hay varios)
+     * @param xmlData Datos crudos del XML parseado
+     * @returns PendingDebtConsultationResponse tipada con array de detalles
      */
     private transformPendingDebtResponse(
-        xmlData: any,
-    ): DebtConsultationResponse {
-        // La deuda pendiente puede venir con DetalleDeuda como array
-        let detalleDeuda = xmlData.DetalleDeuda;
-        if (!Array.isArray(detalleDeuda)) {
-            detalleDeuda = detalleDeuda ? [detalleDeuda] : [];
-        }
+        xmlData: ConsultaDeudaPendienteXmlData,
+    ): PendingDebtConsultationResponse {
+        // Normalizar DetalleDeuda: puede venir como objeto o array
+        let detalleDeudaRaw = xmlData.DetalleDeuda;
+        const detalleDeudaArray = Array.isArray(detalleDeudaRaw)
+            ? detalleDeudaRaw
+            : detalleDeudaRaw
+                ? [detalleDeudaRaw]
+                : [];
 
-        // Usar el primer detalle si existe
-        const firstDetail = detalleDeuda[0] || {};
+        // Transformar cada detalle de deuda
+        const detalleDeuda: PendingDebtDetail[] = detalleDeudaArray.map((detalle) => ({
+            Facturable: String(detalle.Facturable || 'N'),
+            ConceptoDeuda: String(detalle.ConceptoDeuda || ''),
+            PeriodoDeuda: String(detalle.PeriodoDeuda || ''),
+            MultaDeuda: String(detalle.MultaDeuda || '0'),
+            DescuentoDeuda: String(detalle.DescuentoDeuda || '0'),
+            MontoDeuda: String(detalle.MontoDeuda || '0'),
+        }));
 
         return {
             idProceso: String(xmlData.idProceso || 'False'),
             MensajeProceso: String(xmlData.MensajeProceso || ''),
-            idTransaccion: String(xmlData.idTransaccion || '0'),
             NombreDeudor: String(xmlData.NombreDeudor || ''),
-            MonedaDelCobro: xmlData.MonedaDelCobro === 'U' ? 'U' : 'B',
-            MontoDelCobro: String(xmlData.MontoDelCobro || '0'),
-            TipoCambio: String(xmlData.TipoCambio || '6.96'),
-            DetalleDelCobro: {
-                ConceptoPago: String(firstDetail.ConceptoPago || ''),
-                PeriodoPago: String(firstDetail.PeriodoPago || ''),
-                MultaPago: String(firstDetail.MultaPago || '0'),
-                DescuentoPago: String(firstDetail.DescuentoPago || '0'),
-                MontoPago: String(firstDetail.MontoPago || '0'),
-                Facturable: String(firstDetail.Facturable || '0'),
-            },
-            DatosFactura: {
-                IdGeneraFact: String(xmlData.DatosFactura?.IdGeneraFact || '0'),
-                NITCIFact: String(xmlData.DatosFactura?.NITCIFact || ''),
-                NombreFact: String(xmlData.DatosFactura?.NombreFact || ''),
-                ModDatosFact: String(xmlData.DatosFactura?.ModDatosFact || '0'),
-                DocumentType: String(xmlData.DatosFactura?.DocumentType || '0'),
-                Complement: String(xmlData.DatosFactura?.Complement || null),
-            },
+            MonedaDeuda: xmlData.MonedaDeuda === 'U' ? 'U' : 'B',
+            MontoDeuda: String(xmlData.MontoDeuda || '0'),
+            DetalleDeuda: detalleDeuda,
         };
     }
 
@@ -153,6 +162,7 @@ export class SapDebtService {
             idProceso: 'False',
             MensajeProceso: message,
             idTransaccion: '0',
+            parentCode: '',
             NombreDeudor: '',
             MonedaDelCobro: 'U',
             MontoDelCobro: '0',

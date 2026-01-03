@@ -7,6 +7,7 @@ import { postgresConfig, sqlServerConfig } from './config/database.config';
 import { SapModule } from './modules/integrations/sap/sap.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SchoolModule } from './modules/school/school.module';
+import { ExternalApiModule } from './modules/external-api/external-api.module';
 
 @Module({
   imports: [
@@ -33,6 +34,9 @@ import { SchoolModule } from './modules/school/school.module';
 
     // Módulo escolar (deudas, estudiantes, QR payments)
     SchoolModule,
+
+    // Módulo de API externa (bancos y servicios externos)
+    ExternalApiModule,
   ],
   controllers: [AppController],
   providers: [AppService],

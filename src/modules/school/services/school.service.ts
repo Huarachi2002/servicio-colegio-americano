@@ -8,6 +8,7 @@ import { Parallel } from '../../../database/entities/parallel.entity';
 import { ExchangeRate } from '../../../database/entities/exchange-rate.entity';
 import { SapDebtService } from '../../integrations/sap/sap-debt.service';
 import { PaymentService } from './payment.service';
+import { SapService } from '../../integrations/sap/sap.service';
 
 /**
  * SchoolService - Replica la lógica de SchoolApiService de Laravel
@@ -29,6 +30,7 @@ export class SchoolService {
         private readonly exchangeRateRepository: Repository<ExchangeRate>,
         private readonly sapDebtService: SapDebtService,
         private readonly paymentService: PaymentService,
+        private readonly sapService: SapService,
     ) { }
 
     /**
@@ -153,14 +155,8 @@ export class SchoolService {
             // Llamar directamente a SAP con query
             // En Laravel usa DB::connection('tempdb')->select(...)
             // Aquí usamos SapService que ya tiene conexión configurada
-
-            // TODO: Implementar query directa a SAP
-            // SELECT U_Deuda as state FROM OCRD WHERE CardCode = '...'
-
             this.logger.log(`Getting debt state for: ${studentErpCode}`);
-
-            // Por ahora retornamos null (sin deuda)
-            return null;
+            return await this.sapService.getDebtsState(studentErpCode);
         } catch (error) {
             this.logger.error('Cannot query debt state from SAP', error);
             return null;

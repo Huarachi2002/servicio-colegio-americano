@@ -28,7 +28,7 @@ export class SchoolController {
      * POST /api/debt_consultation
      * Consulta de deuda principal
      */
-    @Post('debt_consultation')
+    @Post('debt_consultation') // Deuda mas antigua (mas prioritaria)
     @UseGuards(MobileAuthGuard)
     async debtConsultation(
         @Body() dto: StudentCodeDto,
@@ -55,7 +55,7 @@ export class SchoolController {
      * POST /api/pending_debt_consultation
      * Consulta de deuda pendiente
      */
-    @Post('pending_debt_consultation')
+    @Post('pending_debt_consultation') // Lista de deudas pendiente
     @UseGuards(MobileAuthGuard)
     async pendingDebtConsultation(
         @Body() dto: StudentCodeDto,
@@ -303,15 +303,15 @@ export class SchoolController {
 
             if (debtState === 'B') {
                 message =
-                    'Por favor comunicarse con el departamento de biblioteca\n\n(Sra. María Eugenia Antelo)';
+                    'Por favor comunicarse con el departamento de biblioteca';
                 data = 'BM';
             } else if (debtState === 'M') {
                 message =
-                    'Por favor comunicarse con el departamento de contabilidad\n\n(Sr. Ebert Barrancos)';
+                    'Por favor comunicarse con el departamento de contabilidad';
                 data = 'BM';
             } else if (debtState === 'BM') {
                 message =
-                    'Por favor comunicarse con biblioteca y contabilidad\n\n(Sra. María Eugenia Antelo, Sr. Ebert Barrancos, respectivamente)';
+                    'Por favor comunicarse con biblioteca y contabilidad';
                 data = 'BM';
             }
 
@@ -338,8 +338,8 @@ export class SchoolController {
             status: 'success',
             message: 'App versions retrieved',
             data: {
-                apk_version: '1.0.0', // Configurar en .env
-                ipa_version: '1.0.0', // Configurar en .env
+                apk_version: process.env.APK_VERSION || '1.0.0', // Configurar en .env
+                ipa_version: process.env.IPA_VERSION || '1.0.0', // Configurar en .env
             },
         };
     }
@@ -353,7 +353,7 @@ export class SchoolController {
         return {
             status: 'success',
             message: 'News URL retrieved',
-            data: process.env.NEWS_URL || 'https://colegio-aleman.edu.bo/news',
+            data: process.env.NEWS_URL || 'https://sccs.edu.bo/',
         };
     }
 }

@@ -17,7 +17,7 @@ export class DeviceController {
         };
     }
 
-    @Post('store')
+    @Post('device')
     async store(@Body() deviceDto: DeviceStoreDto): Promise<ApiResponse> {
 
         try {

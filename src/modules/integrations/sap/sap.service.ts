@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as sql from 'mssql';
 import { XMLParser } from 'fast-xml-parser';
+import { ConsultaDeudaPendienteXmlData, ConsultaDeudaXmlData } from './interfaces/debt-consultation.interface';
 
 /**
  * Servicio de conexión con SQL Server para SAP
@@ -54,10 +55,10 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
     /**
      * Ejecutar stored procedure y obtener resultado XML
      */
-    async executeStoredProcedure(
+    async executeStoredProcedure<T = ConsultaDeudaXmlData>(
         procedureName: string,
         studentErpCode: string,
-    ): Promise<any> {
+    ): Promise<T> {
         try {
             this.logger.debug(
                 `Ejecutando ${procedureName} para estudiante: ${studentErpCode}`,
@@ -89,7 +90,7 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
             const parsed = this.xmlParser.parse(xmlString);
 
             // El objeto parseado tiene estructura: { root: { ...datos } }
-            return parsed.root || parsed;
+            return parsed;
         } catch (error) {
             this.logger.error(
                 `Error ejecutando ${procedureName}: ${error.message}`,
@@ -123,6 +124,18 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
         } catch (error) {
             this.logger.warn('No se pudo obtener tipo de cambio, usando default');
             return 6.96;
+        }
+    }
+
+    async getDebtsState(studentErpCode: string): Promise<string | null> {
+        try {
+            const result = await this.query<{ state: string }>(
+                `SELECT U_Deuda as state FROM OCRD WHERE CardCode = '${studentErpCode}'`
+            );
+            return result[0]?.state || null;
+        } catch (error) {
+            this.logger.warn('No se pudo obtener estado de deuda, usando default');
+            return null;
         }
     }
 }
