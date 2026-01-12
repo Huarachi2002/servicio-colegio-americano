@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule } from '@nestjs/config';
+import { HttpModule } from '@nestjs/axios';
 
 // Entities
 import { ApiClient } from '../../database/entities/api-client.entity';
@@ -12,6 +13,7 @@ import { ExternalApiController } from './controllers/external-api.controller';
 
 // Services
 import { ExternalApiService } from './services/external-api.service';
+import { BnbService } from './services/bnb.service';
 
 // Strategies
 import { ApiKeyStrategy } from './strategies/api-key.strategy';
@@ -38,6 +40,9 @@ import { SapServiceLayerService } from '../integrations/sap/sap-service-layer.se
 
         // Config para variables de entorno
         ConfigModule,
+
+        // HTTP Module para BnbService
+        HttpModule,
     ],
     controllers: [
         ExternalApiController,
@@ -45,19 +50,18 @@ import { SapServiceLayerService } from '../integrations/sap/sap-service-layer.se
     providers: [
         // Servicios
         ExternalApiService,
+        BnbService,
         SapServiceLayerService,
 
         // Estrategia de autenticación
         ApiKeyStrategy,
 
-        // SAP Services (si no están en un módulo compartido, se inyectan aquí)
-        // Nota: Estos servicios deberían venir de un módulo compartido
-        // Por ahora los incluimos directamente
         SapService,
         SapDebtService,
     ],
     exports: [
         ExternalApiService,
+        BnbService,
     ],
 })
 export class ExternalApiModule { }

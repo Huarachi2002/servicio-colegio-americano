@@ -10,6 +10,7 @@ import { Parallel } from '../../database/entities/parallel.entity';
 import { Payment } from '../../database/entities/payment.entity';
 import { ExchangeRate } from '../../database/entities/exchange-rate.entity';
 import { SapModule } from '../integrations/sap/sap.module';
+import { ExternalApiModule } from '../external-api/external-api.module';
 
 @Module({
     imports: [
@@ -25,6 +26,9 @@ import { SapModule } from '../integrations/sap/sap.module';
 
         // SAP Module para usar SapDebtService
         SapModule,
+
+        // External API Module para usar BnbService
+        ExternalApiModule,
     ],
     controllers: [SchoolController],
     providers: [SchoolService, PaymentService],
