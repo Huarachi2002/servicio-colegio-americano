@@ -106,3 +106,32 @@ export interface MassSyncResult {
     errors: number;
     results: UserSyncResult[];
 }
+
+/**
+ * Estado de sincronización en background
+ */
+export enum SyncStatus {
+    PENDING = 'pending',
+    RUNNING = 'running',
+    COMPLETED = 'completed',
+    FAILED = 'failed',
+}
+
+/**
+ * Estado de un job de sincronización
+ */
+export interface SyncJobState {
+    jobId: string;
+    status: SyncStatus;
+    total: number;
+    processed: number;
+    created: number;
+    updated: number;
+    skipped: number;
+    errors: number;
+    startedAt: Date;
+    completedAt?: Date;
+    errorMessage?: string;
+    currentBatch?: number;
+    totalBatches?: number;
+}

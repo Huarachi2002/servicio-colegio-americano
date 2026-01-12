@@ -21,10 +21,76 @@ export class SapSyncController {
         
         const result = await this.sapUserSyncService.syncAllUsersFromSAP(filters);
         
+        // Si es background, result contiene jobId
+        if ('jobId' in result) {
+            return {
+                success: true,
+                ...result,
+            };
+        }
+        
+        // Si es síncrono, result contiene los datos completos
         return {
             success: true,
             message: 'Sincronización completada',
             data: result,
+        };
+    }
+
+    /**
+     * Obtiene el estado de un job de sincronización
+     * GET /sap/sync/status/:jobId
+     */
+    @Get('status/:jobId')
+    async getSyncStatus(@Param('jobId') jobId: string) {
+        this.logger.log(`Consultando estado del job: ${jobId}`);
+        
+        const status = this.sapUserSyncService.getJobStatus(jobId);
+        
+        if (!status) {
+            return {
+                success: false,
+                message: 'Job no encontrado o ya fue limpiado',
+            };
+        }
+        
+        return {
+            success: true,
+            data: status,
+        };
+    }
+
+    /**
+     * Obtiene todos los jobs de sincronización activos
+     * GET /sap/sync/status
+     */
+    @Get('status')
+    async getAllSyncStatus() {
+        this.logger.log('Consultando todos los jobs de sincronización');
+        
+        const jobs = this.sapUserSyncService.getAllJobs();
+        
+        return {
+            success: true,
+            count: jobs.length,
+            data: jobs,
+        };
+    }
+
+    /**
+     * Limpia jobs antiguos completados o fallidos
+     * POST /sap/sync/cleanup
+     */
+    @Post('cleanup')
+    async cleanupJobs() {
+        this.logger.log('Limpiando jobs antiguos');
+        
+        const cleaned = this.sapUserSyncService.cleanupOldJobs();
+        
+        return {
+            success: true,
+            message: `${cleaned} jobs limpiados`,
+            cleaned,
         };
     }
 

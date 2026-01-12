@@ -5,12 +5,16 @@ import * as bcrypt from 'bcrypt';
 import { MobileUser } from 'src/database/entities/mobile-user.entity';
 import { Father } from 'src/database/entities/father.entity';
 import { SapService } from './sap.service';
-import { SapBusinessPartner, UserSyncResult, MassSyncResult } from './interfaces/sap.interface';
+import { SapBusinessPartner, UserSyncResult, MassSyncResult, SyncJobState, SyncStatus } from './interfaces/sap.interface';
 import { SyncUsersFilterDto } from './dto/sync-user.dto';
 
 @Injectable()
 export class SapSyncService {
     private readonly logger = new Logger(SapSyncService.name);
+    
+    // Almacenamiento en memoria de jobs de sincronización
+    // En producción, considerar usar Redis o base de datos
+    private syncJobs = new Map<string, SyncJobState>();
 
     constructor(
         @InjectRepository(MobileUser)
@@ -62,6 +66,13 @@ export class SapSyncService {
 
             const whereClause = whereConditions.join(' AND ');
 
+            // Construir cláusula de paginación
+            let paginationClause = '';
+            if (filters?.limit !== undefined) {
+                const offset = filters.offset || 0;
+                paginationClause = `OFFSET ${offset} ROWS FETCH NEXT ${filters.limit} ROWS ONLY`;
+            }
+
             // Query SQL para obtener socios de negocio
             const query = `
                 SELECT 
@@ -76,6 +87,7 @@ export class SapSyncService {
                 FROM OCRD
                 WHERE ${whereClause}
                 ORDER BY CardCode
+                ${paginationClause}
             `;
 
             this.logger.debug(`Ejecutando query: ${query}`);
@@ -269,12 +281,107 @@ export class SapSyncService {
 
     /**
      * Sincroniza todos los Socios de Negocio de SAP
+     * Soporta procesamiento en background y por lotes
      */
-    async syncAllUsersFromSAP(filters?: SyncUsersFilterDto): Promise<MassSyncResult> {
-        this.logger.log('Iniciando sincronización masiva de usuarios desde SAP...');
+    async syncAllUsersFromSAP(filters?: SyncUsersFilterDto): Promise<MassSyncResult | { jobId: string; message: string }> {
+        // Si se solicita procesamiento en background
+        if (filters?.background) {
+            return this.startBackgroundSync(filters);
+        }
 
+        // Procesamiento síncrono (foreground)
+        return this.performSync(filters);
+    }
+
+    /**
+     * Inicia sincronización en background
+     */
+    private startBackgroundSync(filters: SyncUsersFilterDto): { jobId: string; message: string } {
+        const jobId = `sync-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        const jobState: SyncJobState = {
+            jobId,
+            status: SyncStatus.PENDING,
+            total: 0,
+            processed: 0,
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            errors: 0,
+            startedAt: new Date(),
+        };
+        
+        this.syncJobs.set(jobId, jobState);
+        
+        // Ejecutar en background (no await)
+        this.performBackgroundSync(jobId, filters).catch(error => {
+            this.logger.error(`Error en job ${jobId}:`, error);
+            const job = this.syncJobs.get(jobId);
+            if (job) {
+                job.status = SyncStatus.FAILED;
+                job.errorMessage = error.message;
+                job.completedAt = new Date();
+            }
+        });
+        
+        this.logger.log(`Job de sincronización iniciado: ${jobId}`);
+        
+        return {
+            jobId,
+            message: 'Sincronización iniciada en background. Use GET /sap/sync/status/:jobId para verificar el progreso.',
+        };
+    }
+
+    /**
+     * Ejecuta sincronización en background
+     */
+    private async performBackgroundSync(jobId: string, filters: SyncUsersFilterDto): Promise<void> {
+        const job = this.syncJobs.get(jobId);
+        if (!job) return;
+
+        try {
+            job.status = SyncStatus.RUNNING;
+            
+            const result = await this.performSync(filters, jobId);
+            
+            // Actualizar estado final
+            job.status = SyncStatus.COMPLETED;
+            job.total = result.total;
+            job.processed = result.total;
+            job.created = result.created;
+            job.updated = result.updated;
+            job.skipped = result.skipped;
+            job.errors = result.errors;
+            job.completedAt = new Date();
+            
+            this.logger.log(`Job ${jobId} completado exitosamente`);
+        } catch (error) {
+            job.status = SyncStatus.FAILED;
+            job.errorMessage = error.message;
+            job.completedAt = new Date();
+            throw error;
+        }
+    }
+
+    /**
+     * Ejecuta la sincronización (core)
+     * Soporta procesamiento por lotes para evitar timeouts
+     */
+    private async performSync(filters?: SyncUsersFilterDto, jobId?: string): Promise<MassSyncResult> {
+        this.logger.log('Iniciando sincronización de usuarios desde SAP...');
+
+        const batchSize = filters?.batchSize || 50; // Procesar de 50 en 50 por defecto
+        
         // Obtener todos los socios de negocio
         const businessPartners = await this.getBusinessPartnersFromSAP(filters);
+        
+        if (jobId) {
+            const job = this.syncJobs.get(jobId);
+            if (job) {
+                job.total = businessPartners.length;
+                job.totalBatches = Math.ceil(businessPartners.length / batchSize);
+            }
+        }
 
         const results: UserSyncResult[] = [];
         let created = 0;
@@ -282,18 +389,53 @@ export class SapSyncService {
         let skipped = 0;
         let errors = 0;
 
-        // Procesar cada socio de negocio
-        for (const bp of businessPartners) {
-            const result = await this.syncBusinessPartner(bp);
-            results.push(result);
+        // Procesar en lotes (batches)
+        for (let i = 0; i < businessPartners.length; i += batchSize) {
+            const batch = businessPartners.slice(i, i + batchSize);
+            const batchNumber = Math.floor(i / batchSize) + 1;
+            const totalBatches = Math.ceil(businessPartners.length / batchSize);
+            
+            this.logger.log(`Procesando lote ${batchNumber}/${totalBatches} (${batch.length} registros)`);
+            
+            // Actualizar estado del job
+            if (jobId) {
+                const job = this.syncJobs.get(jobId);
+                if (job) {
+                    job.currentBatch = batchNumber;
+                    job.processed = i;
+                }
+            }
+            
+            // Procesar batch
+            for (const bp of batch) {
+                const result = await this.syncBusinessPartner(bp);
+                results.push(result);
 
-            if (result.success) {
-                if (result.action === 'created') created++;
-                else if (result.action === 'updated') updated++;
-            } else if (result.action === 'skipped') {
-                skipped++;
-            } else {
-                errors++;
+                if (result.success) {
+                    if (result.action === 'created') created++;
+                    else if (result.action === 'updated') updated++;
+                } else if (result.action === 'skipped') {
+                    skipped++;
+                } else {
+                    errors++;
+                }
+                
+                // Actualizar progreso del job
+                if (jobId) {
+                    const job = this.syncJobs.get(jobId);
+                    if (job) {
+                        job.processed++;
+                        job.created = created;
+                        job.updated = updated;
+                        job.skipped = skipped;
+                        job.errors = errors;
+                    }
+                }
+            }
+            
+            // Pequeña pausa entre lotes para no saturar la BD
+            if (i + batchSize < businessPartners.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         }
 
@@ -309,5 +451,44 @@ export class SapSyncService {
             errors,
             results,
         };
+    }
+
+    /**
+     * Obtiene el estado de un job de sincronización
+     */
+    getJobStatus(jobId: string): SyncJobState | null {
+        return this.syncJobs.get(jobId) || null;
+    }
+
+    /**
+     * Obtiene todos los jobs de sincronización
+     */
+    getAllJobs(): SyncJobState[] {
+        return Array.from(this.syncJobs.values());
+    }
+
+    /**
+     * Limpia jobs completados o fallidos antiguos (más de 1 hora)
+     */
+    cleanupOldJobs(): number {
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        let cleaned = 0;
+        
+        for (const [jobId, job] of this.syncJobs.entries()) {
+            if (
+                (job.status === SyncStatus.COMPLETED || job.status === SyncStatus.FAILED) &&
+                job.completedAt &&
+                job.completedAt < oneHourAgo
+            ) {
+                this.syncJobs.delete(jobId);
+                cleaned++;
+            }
+        }
+        
+        if (cleaned > 0) {
+            this.logger.log(`Limpiados ${cleaned} jobs antiguos`);
+        }
+        
+        return cleaned;
     }
 }
