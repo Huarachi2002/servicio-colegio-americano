@@ -27,7 +27,7 @@ export class ApiClient {
     @Column({ name: 'allowed_ips', type: 'text', nullable: true })
     allowedIps: string;  // IPs permitidas separadas por coma (opcional)
 
-    @Column({ default: true })
+    @Column({ type: 'bit', default: true })
     active: boolean;
 
     @Column({ name: 'rate_limit', default: 100 })

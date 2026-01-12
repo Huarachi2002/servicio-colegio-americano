@@ -14,7 +14,7 @@ export class ExchangeRate {
     @Column({ name: 'exchange_rate', type: 'decimal', precision: 10, scale: 4 })
     exchangeRate: number;
 
-    @Column({ type: 'boolean', default: true })
+    @Column({ type: 'bit', default: true })
     enabled: boolean;
 
     @CreateDateColumn({ name: 'created_at' })

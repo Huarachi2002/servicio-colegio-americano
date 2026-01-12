@@ -38,7 +38,7 @@ export class Employee {
     @Column({ name: 'dni_expiry_date', nullable: true })
     dniExpiryDate: Date;
 
-    @Column({ name: 'manager', default: false })
+    @Column({ name: 'manager', type: 'bit', default: false })
     manager: boolean;
 
     @Column({ name: 'state' })
