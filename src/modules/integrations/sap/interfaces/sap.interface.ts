@@ -67,3 +67,42 @@ export interface ProcessPaymentDto {
         lineNum: number;
     }[];
 }
+
+/**
+ * Interfaz para Socio de Negocio de SAP
+ */
+export interface SapBusinessPartner {
+    CardCode: string;           // Código del Socio de Negocio
+    CardName: string;           // Nombre completo
+    CardType: string;           // 'C' = Cliente, 'S' = Proveedor, 'L' = Lead
+    FederalTaxID: string;       // NIT o Documento de Identidad
+    EmailAddress?: string;      // Email
+    Phone1?: string;            // Teléfono
+    Valid: string;              // 'Y' = Válido/Activo, 'N' = Inactivo
+    GroupCode?: number;         // Código de grupo
+}
+
+/**
+ * Resultado de sincronización de un usuario
+ */
+export interface UserSyncResult {
+    cardCode: string;
+    cardName: string;
+    username: string;
+    success: boolean;
+    action: 'created' | 'updated' | 'skipped' | 'error';
+    message?: string;
+    error?: string;
+}
+
+/**
+ * Resultado de sincronización masiva
+ */
+export interface MassSyncResult {
+    total: number;
+    created: number;
+    updated: number;
+    skipped: number;
+    errors: number;
+    results: UserSyncResult[];
+}

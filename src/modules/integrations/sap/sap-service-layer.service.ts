@@ -236,9 +236,28 @@ export class SapServiceLayerService {
     /**
      * Asegura que hay una sesión activa
      */
-    private async ensureSession(): Promise<void> {
+    async ensureSession(): Promise<void> {
         if (!this.sessionId || !this.sessionExpiry || new Date() > this.sessionExpiry) {
             await this.login();
+        }
+    }
+
+    /**
+     * GET genérico para Service Layer
+     */
+    async get<T>(endpoint: string): Promise<T> {
+        await this.ensureSession();
+
+        try {
+            const response = await axios.get(`${this.baseUrl}${endpoint}`, {
+                headers: this.getHeaders(),
+            });
+
+            return response.data;
+        } catch (error) {
+            const errorMsg = error.response?.data?.error?.message?.value || error.message;
+            this.logger.error(`Error en GET ${endpoint}:`, errorMsg);
+            throw new Error(errorMsg);
         }
     }
 
