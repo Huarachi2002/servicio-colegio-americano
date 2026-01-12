@@ -10,19 +10,12 @@ import {
     ConsultaDeudaPendienteXmlData,
 } from './interfaces/debt-consultation.interface';
 
-/**
- * Servicio especializado para consultas de deuda desde SAP
- */
 @Injectable()
 export class SapDebtService {
     private readonly logger = new Logger(SapDebtService.name);
 
     constructor(private readonly sapService: SapService) { }
 
-    /**
-     * Consultar deuda del estudiante (SP_A_ConsultaDeudaLaravel)
-     * Retorna una deuda específica con datos de facturación
-     */
     async getDebtConsultation(
         studentErpCode: string,
     ): Promise<DebtConsultationResponse | null> {
@@ -51,10 +44,6 @@ export class SapDebtService {
         }
     }
 
-    /**
-     * Consultar deuda pendiente (SP_B_ConsultaDeudaPendiente)
-     * Retorna lista completa de deudas pendientes del estudiante
-     */
     async getPendingDebtConsultation(
         studentErpCode: string,
     ): Promise<PendingDebtConsultationResponse | null> {
@@ -80,11 +69,6 @@ export class SapDebtService {
         }
     }
 
-    /**
-     * Transformar respuesta XML de SP_A_ConsultaDeudaLaravel
-     * @param xmlData Datos crudos del XML parseado
-     * @returns DebtConsultationResponse tipada
-     */
     private transformDebtResponse(xmlData: ConsultaDeudaXmlData): DebtConsultationResponse {
         return {
             idProceso: String(xmlData.idProceso || 'False'),
@@ -116,13 +100,6 @@ export class SapDebtService {
         };
     }
 
-    /**
-     * Transformar respuesta XML de SP_B_ConsultaDeudaPendiente
-     * El XML puede tener múltiples nodos DetalleDeuda que el parser
-     * puede devolver como objeto (si hay uno) o array (si hay varios)
-     * @param xmlData Datos crudos del XML parseado
-     * @returns PendingDebtConsultationResponse tipada con array de detalles
-     */
     private transformPendingDebtResponse(
         xmlData: ConsultaDeudaPendienteXmlData,
     ): PendingDebtConsultationResponse {
@@ -154,9 +131,6 @@ export class SapDebtService {
         };
     }
 
-    /**
-     * Respuesta vacía cuando no hay deuda
-     */
     private getEmptyDebtResponse(message: string): DebtConsultationResponse {
         return {
             idProceso: 'False',

@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import axios from 'axios';
 import { Payment } from '../../../database/entities/payment.entity';
 import { ExchangeRate } from '../../../database/entities/exchange-rate.entity';
+import { BnbService } from 'src/modules/external-api/services/bnb.service';
 import { DebtConsultationResponse } from '../../integrations/sap/interfaces/debt-consultation.interface';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -28,11 +29,11 @@ export class PaymentService {
         private readonly paymentRepository: Repository<Payment>,
         @InjectRepository(ExchangeRate)
         private readonly exchangeRateRepository: Repository<ExchangeRate>,
+        private readonly bnbService: BnbService,
     ) { }
 
     /**
      * Guardar información de pago y generar QR
-     * Replica: PaymentRepository::savePayment()
      */
     async savePaymentInformation(
         erpCode: string,
@@ -45,8 +46,13 @@ export class PaymentService {
             const now = new Date();
             now.setHours(0, 0, 0, 0);
 
-            const existingPayment = null; // Siempre crear nuevo como en Laravel
+            // Buscar pago existente
+            const existingPayment = await this.paymentRepository.findOneBy({
+                erpCode,
+                expirationDate: now,
+            });
 
+            // Si no existe, crear nuevo
             if (!existingPayment) {
                 const glossAux = debtInformation.DetalleDelCobro;
                 const invoiceData = debtInformation.DatosFactura;
@@ -81,12 +87,12 @@ export class PaymentService {
                 );
 
                 // Generar QR desde API BNB
-                const qrResponse = await this.getQr(
-                    `${erpCode}, ${glossAux.PeriodoPago} ${glossAux.ConceptoPago}`,
-                    debtInformation.MontoDelCobro,
-                    expirationDate,
+                const qrResponse = await this.bnbService.generateQR(
                     additionalData,
+                    debtInformation.MontoDelCobro,
+                    `${erpCode}, ${glossAux.PeriodoPago} ${glossAux.ConceptoPago}`,
                     debtInformation.MonedaDelCobro,
+                    expirationDate,
                 );
 
                 if (qrResponse && qrResponse.success) {
@@ -116,58 +122,6 @@ export class PaymentService {
                 message: error.message,
                 stack: error.stack,
             });
-            return null;
-        }
-    }
-
-    /**
-     * Llamar API BNB para generar QR
-     * Replica: PaymentRepository::getQr()
-     */
-    private async getQr(
-        gloss: string,
-        amount: string | number,
-        expirationDate: string,
-        additionalData: any,
-        currency: string = 'USD',
-    ): Promise<any> {
-        try {
-            // Convertir 'U' a 'USD' si es necesario
-            if (currency === 'U') {
-                currency = 'USD';
-            }
-
-            const requestBody = {
-                currency,
-                gloss,
-                amount: Math.round(parseFloat(amount.toString()) * 100) / 100, // Round to 2 decimals
-                singleUse: true,
-                expirationDate,
-                additionalData: JSON.stringify(additionalData),
-                destinationAccountId: currency === 'USD' ? 2 : 1,
-            };
-
-            this.logger.log('QR Request:', JSON.stringify(requestBody));
-
-            // Obtener authorization token
-            const authorization = await this.getAuthorization(true);
-
-            const response = await axios.post(
-                `${this.BNB_BASE_URL}/QRSimple.API/api/v1/main/getQRWithImageAsync`,
-                requestBody,
-                {
-                    headers: {
-                        Authorization: authorization,
-                    },
-                },
-            );
-
-            this.logger.log('QR Response:', JSON.stringify(response));
-            this.logger.log('QR Response Data:', JSON.stringify(response.data));
-
-            return response.data;
-        } catch (error) {
-            this.logger.error('Error calling BNB QR API:', error.message);
             return null;
         }
     }

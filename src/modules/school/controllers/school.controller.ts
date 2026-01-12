@@ -15,6 +15,7 @@ import { MobileUser } from '../../../database/entities/mobile-user.entity';
 import { ApiResponse } from '../../../common/interfaces/api-response.interface';
 import { StudentCodeDto } from '../../integrations/sap/dto/student-code.dto';
 import { GenerateQrDto } from '../dto/generate-qr.dto';
+import { BnbService } from 'src/modules/external-api/services/bnb.service';
 
 /**
  * SchoolController - Replica de SchoolApiController de Laravel
@@ -22,7 +23,10 @@ import { GenerateQrDto } from '../dto/generate-qr.dto';
  */
 @Controller()
 export class SchoolController {
-    constructor(private readonly schoolService: SchoolService) { }
+    constructor(
+        private readonly schoolService: SchoolService,
+        private readonly bnbService: BnbService
+    ) { }
 
     /**
      * POST /api/debt_consultation

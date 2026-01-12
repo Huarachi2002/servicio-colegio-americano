@@ -97,3 +97,6 @@ npm run migration:generate src/database/migrations/InitialMigration
 
 # Ahora sí puedes construir toda la aplicación
 docker-compose up --build
+
+# TODO
+Para reprocesos en caso de que alguna cobranza no se haya realizado correctamente hay que diseñar un nueva logica
