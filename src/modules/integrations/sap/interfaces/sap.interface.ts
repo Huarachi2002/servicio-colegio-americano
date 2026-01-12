@@ -78,7 +78,7 @@ export interface SapBusinessPartner {
     FederalTaxID: string;       // NIT o Documento de Identidad
     EmailAddress?: string;      // Email
     Phone1?: string;            // Teléfono
-    Valid: string;              // 'Y' = Válido/Activo, 'N' = Inactivo
+    ValidFor: string;              // 'Y' = Válido/Activo, 'N' = Inactivo
     GroupCode?: number;         // Código de grupo
 }
 

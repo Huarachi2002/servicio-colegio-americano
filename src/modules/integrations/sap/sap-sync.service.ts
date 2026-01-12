@@ -53,7 +53,7 @@ export class SapSyncService {
             let whereConditions = ["CardType = 'C'"]; // Solo clientes por defecto
             
             if (filters?.validFor) {
-                whereConditions.push(`Valid = '${filters.validFor}'`);
+                whereConditions.push(`ValidFor = '${filters.validFor}'`);
             }
             
             if (filters?.groupCode) {
@@ -71,7 +71,7 @@ export class SapSyncService {
                     LicTradNum AS FederalTaxID,
                     E_Mail AS EmailAddress,
                     Phone1,
-                    Valid,
+                    ValidFor,
                     GroupCode
                 FROM OCRD
                 WHERE ${whereClause}
@@ -104,7 +104,7 @@ export class SapSyncService {
                     LicTradNum AS FederalTaxID,
                     E_Mail AS EmailAddress,
                     Phone1,
-                    Valid,
+                    ValidFor,
                     GroupCode
                 FROM OCRD
                 WHERE CardCode = '${cardCode}'
@@ -187,7 +187,7 @@ export class SapSyncService {
                     name: CardName,
                     email: EmailAddress || null,
                     erpCode: CardCode,
-                    state: bp.Valid === 'Y' ? 1 : 0,
+                    state: bp.ValidFor === 'Y' ? 1 : 0,
                 });
                 await this.fatherRepository.save(father);
                 this.logger.log(`Creado registro Father para ${CardCode}`);
@@ -195,7 +195,7 @@ export class SapSyncService {
                 // Actualizar datos
                 father.name = CardName;
                 father.email = EmailAddress || father.email;
-                father.state = bp.Valid === 'Y' ? 1 : 0;
+                father.state = bp.ValidFor === 'Y' ? 1 : 0;
                 await this.fatherRepository.save(father);
                 this.logger.log(`Actualizado registro Father para ${CardCode}`);
             }
@@ -228,7 +228,7 @@ export class SapSyncService {
                     entity_id: father.id,
                     entity_type: 'Father',
                     user_type: 1, // FATHER
-                    state: bp.Valid === 'Y' ? 1 : 0,
+                    state: bp.ValidFor === 'Y' ? 1 : 0,
                 });
                 
                 await this.mobileUserRepository.save(mobileUser);
@@ -240,7 +240,7 @@ export class SapSyncService {
                 mobileUser.name = CardName;
                 mobileUser.email = EmailAddress || mobileUser.email;
                 mobileUser.password = hashedPassword; // Actualizar contraseña
-                mobileUser.state = bp.Valid === 'Y' ? 1 : 0;
+                mobileUser.state = bp.ValidFor === 'Y' ? 1 : 0;
                 
                 await this.mobileUserRepository.save(mobileUser);
                 this.logger.log(`Actualizado usuario móvil ${mobileUser.username} para ${CardCode}`);
