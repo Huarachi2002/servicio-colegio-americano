@@ -17,7 +17,7 @@ import { ExternalApiService } from '../services/external-api.service';
 import { PaymentNotificationDto } from '../dto/payment-notification.dto';
 import { ExternalApiResponse } from '../interfaces/external-api-response.interface';
 
-@Controller('api/external')
+@Controller('external')
 @UseGuards(ApiKeyAuthGuard)
 export class ExternalApiController {
     private readonly logger = new Logger(ExternalApiController.name);
