@@ -32,12 +32,12 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
      */
     async onModuleInit() {
         try {
-            const config = this.configService.get<sql.config>('sqlserver');
+            const config = this.configService.get<sql.config>('sapDatabase');
             this.pool = new sql.ConnectionPool(config);
             await this.pool.connect();
-            this.logger.log('Conectado a SQL Server exitosamente');
+            this.logger.log('Conectado a SQL Server SAP exitosamente');
         } catch (error) {
-            this.logger.error('Error conectando a SQL Server:', error.message);
+            this.logger.error('Error conectando a SQL Server SAP:', error.message);
             throw error;
         }
     }
