@@ -14,7 +14,7 @@ export class BnbService {
         private readonly configService: ConfigService,
     ) { }
 
-    private async authenticate(): Promise<string> {
+    async authenticate(): Promise<string> {
         try {
             const url = `${this.configService.get('BNB_API_URL')}/ClientAuthentication.API/api/v1/auth/token`;
             const body = {
@@ -22,17 +22,39 @@ export class BnbService {
                 accountPassword: this.configService.get('BNB_AUTH_ID'),
             };
 
+            this.logger.log(`Autenticando con BNB: ${url}`);
+            this.logger.debug(`Credenciales: accountId=${body.accountId}`);
+
             const response = await lastValueFrom(this.httpService.post(url, body));
+
+            this.logger.log('Respuesta de autenticación BNB:', JSON.stringify(response.data));
 
             if (response.data.success) {
                 this.token = response.data.message;
+                this.logger.log('Autenticación exitosa con BNB');
                 return this.token;
             } else {
-                throw new Error('Fallo la autenticacion con BNB');
+                this.logger.error('BNB rechazó la autenticación:', response.data);
+                throw new Error(`Fallo la autenticacion con BNB: ${JSON.stringify(response.data)}`);
             }
         } catch (error) {
-            this.logger.error('Error autenticando con BNB', error);
-            throw new HttpException('Error de comunicación bancaria', HttpStatus.BAD_GATEWAY);
+            this.logger.error('Error autenticando con BNB');
+            
+            if (error.response) {
+                this.logger.error(`Status: ${error.response.status}`);
+                this.logger.error(`Data: ${JSON.stringify(error.response.data)}`);
+                this.logger.error(`Headers: ${JSON.stringify(error.response.headers)}`);
+            } else if (error.request) {
+                this.logger.error('No se recibió respuesta del servidor BNB');
+                this.logger.error(`Error: ${error.message}`);
+            } else {
+                this.logger.error(`Error: ${error.message}`);
+            }
+            
+            throw new HttpException(
+                `Error de comunicación bancaria: ${error.message}`,
+                HttpStatus.BAD_GATEWAY
+            );
         }
     }
 

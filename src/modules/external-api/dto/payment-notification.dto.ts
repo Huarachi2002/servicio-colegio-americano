@@ -50,6 +50,7 @@ export class PaymentNotificationDto {
     sinPaymentMethod: number; 
 
     @IsNumber()
+    @IsOptional()
     documentTypeIdentity: number;
 
     @IsOptional()

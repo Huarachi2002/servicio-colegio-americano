@@ -16,13 +16,19 @@ import { ApiClient } from '../../../database/entities/api-client.entity';
 import { ExternalApiService } from '../services/external-api.service';
 import { PaymentNotificationDto } from '../dto/payment-notification.dto';
 import { ExternalApiResponse } from '../interfaces/external-api-response.interface';
+import { BnbService } from '../services/bnb.service';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('external')
 @UseGuards(ApiKeyAuthGuard)
 export class ExternalApiController {
     private readonly logger = new Logger(ExternalApiController.name);
 
-    constructor(private readonly externalApiService: ExternalApiService) { }
+    constructor(
+        private readonly externalApiService: ExternalApiService,
+        private readonly bnbService: BnbService,
+        private readonly configService: ConfigService,
+    ) { }
 
     /**
      * Buscar deudores por CI/NIT del padre (socio de negocio)
@@ -151,6 +157,52 @@ export class ExternalApiController {
             client: client.name,
             timestamp: new Date().toISOString(),
         });
+    }
+
+    /**
+     * GET /api/external/bnb/test
+     */
+    @Get('bnb/test')
+    async testBnbConnection(): Promise<any> {
+        const requestId = this.externalApiService.generateRequestId();
+        this.logger.log(`[${requestId}] Testing BNB connection...`);
+
+        try {
+            // Información de configuración (sin exponer credenciales completas)
+            const config = {
+                url: this.configService.get('BNB_API_URL'),
+                accountId: this.configService.get('BNB_ACCOUNT_ID')?.substring(0, 10) + '...',
+                authIdConfigured: !!this.configService.get('BNB_AUTH_ID'),
+            };
+
+            this.logger.log(`[${requestId}] BNB Config: ${JSON.stringify(config)}`);
+
+            // Intentar autenticarse
+            const result = await this.bnbService.authenticate();
+
+            return {
+                success: true,
+                message: 'Conexión exitosa con BNB',
+                requestId,
+                config,
+                tokenReceived: !!result,
+                tokenPreview: result?.substring(0, 20) + '...',
+            };
+        } catch (error) {
+            this.logger.error(`[${requestId}] BNB test failed: ${error.message}`);
+            
+            return {
+                success: false,
+                message: 'Error conectando con BNB',
+                requestId,
+                error: error.message,
+                config: {
+                    url: this.configService.get('BNB_API_URL'),
+                    accountIdConfigured: !!this.configService.get('BNB_ACCOUNT_ID'),
+                    authIdConfigured: !!this.configService.get('BNB_AUTH_ID'),
+                },
+            };
+        }
     }
 
     /**
