@@ -25,7 +25,7 @@ export interface DebtConsultationResponse {
     idTransaccion: string; // DocEntry de SAP
     parentCode: string; // Codigo de la tarjeta
     NombreDeudor: string; // Nombre del estudiante/deudor
-    MonedaDelCobro: 'U' | 'B'; // U=USD, B=BOB
+    MonedaDelCobro: string; // U=USD, B=BOB
     MontoDelCobro: string; // Monto total (string desde XML)
     TipoCambio?: string; // Tipo de cambio (opcional, puede no venir)
     DetalleDelCobro: DebtDetail;
@@ -99,7 +99,9 @@ export interface PendingDebtConsultationResponse {
     idProceso: string; // 'True' o 'False'
     MensajeProceso: string; // Mensaje de error o vacío
     NombreDeudor: string; // Nombre del estudiante/deudor
-    MonedaDeuda: 'U' | 'B'; // U=USD, B=BOB
+    RazonSocial?: string; // Nombre para facturación (opcional)
+    Nit?: string; // NIT o CI para facturación (opcional)
+    MonedaDeuda: string; // U=USD, B=BOB
     MontoDeuda: string; // Monto total de deuda pendiente
     DetalleDeuda: PendingDebtDetail[]; // Array de detalles de deuda
 }
@@ -120,21 +122,12 @@ export interface PendingDebtDetail {
     Facturable: string; // 'Y' o 'N' (Si es facturable)
     ConceptoDeuda: string; // Ej: "Mensualidad"
     PeriodoDeuda: string; // Ej: "2 - 2026" (mes - año)
+    FechaVencimiento: string; // Fecha de vencimiento (YYYY-MM-DD)
     MultaDeuda: string; // Monto de multa
     DescuentoDeuda: string; // Monto de descuento
     MontoDeuda: string; // Monto de la deuda
 }
 
-/**
- * =====================================================
- * INTERFACES AUXILIARES PARA XML PARSEADO
- * Estructuras que vienen del parser XML (antes de transformar)
- * =====================================================
- */
-
-/**
- * Datos crudos del XML de SP_ConsultaDeudaLaravel
- */
 export interface ConsultaDeudaXmlData {
     idProceso?: string | boolean;
     MensajeProceso?: string;
@@ -170,6 +163,8 @@ export interface ConsultaDeudaPendienteXmlData {
     idProceso?: string | boolean;
     MensajeProceso?: string;
     NombreDeudor?: string;
+    RazonSocial?: string;
+    Nit?: string;
     MonedaDeuda?: string;
     MontoDeuda?: string | number;
     DetalleDeuda?: PendingDebtDetailXmlData | PendingDebtDetailXmlData[]; // Puede ser objeto o array

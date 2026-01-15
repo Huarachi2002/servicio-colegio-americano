@@ -6,8 +6,8 @@ import { Type } from 'class-transformer';
  */
 export class PaymentNotificationDto {
     @IsString()
-    @IsNotEmpty()
-    transactionId: string;  // ID único del banco (para idempotencia)
+    @IsOptional()
+    transactionId?: string;  // ID único del banco (para idempotencia)
 
     @IsString()
     @IsNotEmpty()
@@ -17,7 +17,6 @@ export class PaymentNotificationDto {
     amount: number;  // Monto pagado
 
     @IsString()
-    @IsIn(['USD', 'BOB'])
     currency: string;
 
     @IsDateString()
@@ -28,14 +27,16 @@ export class PaymentNotificationDto {
     receiptNumber?: string;  // Número de recibo del banco
 
     @IsString()
-    razonSocial: string;  
+    @IsOptional()
+    razonSocial?: string;  
 
     @IsString()
-    nit: string;
+    @IsOptional()
+    nit?: string;
     
     @IsOptional()
     @IsString()
-    email: string;  
+    email?: string;  
     
     @IsOptional()
     @IsString()
@@ -50,7 +51,7 @@ export class PaymentNotificationDto {
 
     @IsNumber()
     @IsOptional()
-    documentTypeIdentity: number;
+    documentTypeIdentity?: number;
 
     @IsOptional()
     @IsString()

@@ -104,9 +104,6 @@ export class ExternalApiService {
             if (!debtData || debtData.idProceso === 'False') {
                 return null;
             }
-
-            // Transformar a formato de lista
-            // TODO: El SP actual retorna una deuda, si hay múltiples necesitamos ajustar
             return debtData;
         } catch (error) {
             this.logger.error(`Error obteniendo deudas: ${error.message}`);
@@ -136,10 +133,200 @@ export class ExternalApiService {
     }
 
     /**
-     * Procesar notificación de pago desde servicio externo
-     * - Valida idempotencia
-     * - Guarda en BD
-     * - Sincroniza con SAP (Factura + Pago)
+     * Verificar si una notificación ya existe (sincrónico)
+     */
+    async checkExistingNotification(transactionId: string): Promise<PaymentConfirmation | null> {
+        const existing = await this.paymentNotificationRepo.findOne({
+            where: { externalTransactionId: transactionId },
+        });
+
+        if (!existing) {
+            return null;
+        }
+
+        return {
+            internalId: existing.id,
+            transactionId: existing.externalTransactionId,
+            status: existing.status as any,
+            processedAt: existing.processedAt?.toISOString(),
+            sapInvoiceDocNum: existing.sapInvoiceDocNum,
+            sapPaymentDocNum: existing.sapPaymentDocNum,
+            message: 'El pago ya fue procesado anteriormente',
+        };
+    }
+
+    /**
+     * Crear registro inicial de notificación (sincrónico)
+     */
+    async createInitialNotification(
+        dto: PaymentNotificationDto,
+        apiClientId: number,
+    ): Promise<PaymentNotification> {
+        const apiClient = await this.apiClientRepo.findOne({ where: { id: apiClientId } });
+        if (!apiClient) {
+            throw new Error(`Cliente API con ID ${apiClientId} no encontrado`);
+        }
+
+        const notification = this.paymentNotificationRepo.create({
+            externalTransactionId: dto.transactionId,
+            studentCode: dto.studentCode,
+            parentCardCode: '', // Se llenará en el procesamiento async
+            amount: dto.amount,
+            currency: dto.currency,
+            apiClientId: apiClient.id,
+            status: 'RECEIVED',
+            sapSyncStatus: 'PENDING',
+            paymentDate: new Date(dto.paymentDate),
+            receiptNumber: dto.receiptNumber,
+            rawPayload: JSON.stringify(dto),
+        });
+
+        return await this.paymentNotificationRepo.save(notification);
+    }
+
+    /**
+     * Procesar notificación de pago de forma asincrónica
+     * Este método NO bloquea la respuesta HTTP
+     */
+    async processPaymentNotificationAsync(
+        dto: PaymentNotificationDto,
+        apiClientId: number,
+        requestId: string,
+    ): Promise<void> {
+        try {
+            this.logger.log(`[${requestId}] Iniciando procesamiento async de pago: ${dto.transactionId}`);
+
+            // Obtener información del estudiante
+            const debtInfo = await this.getPriorityDebt(dto.studentCode);
+
+            // Obtener notificación creada
+            const notification = await this.paymentNotificationRepo.findOne({
+                where: { externalTransactionId: dto.transactionId },
+            });
+
+            if (!notification) {
+                throw new Error('Notificación no encontrada');
+            }
+
+            // Actualizar CardCode del padre
+            if (debtInfo?.parentCode) {
+                notification.parentCardCode = debtInfo.parentCode;
+            }
+
+            // Obtener configuracion del Cliente API
+            const apiClient = await this.apiClientRepo.findOne({ where: { id: apiClientId } });
+            if (!apiClient) {
+                throw new Error(`Cliente API con ID ${apiClientId} no encontrado`);
+            }
+
+            let cuentaContableSap = '';
+            this.logger.log(`[${requestId}] Obteniendo cuenta contable SAP para cliente API: ${apiClient.name}`);
+            switch (apiClient.name) {
+                case 'BNB':
+                    cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BNB');
+                    break;
+                case 'BG':
+                    cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BG');
+                    break;
+                case 'LUKA':
+                    this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${dto.sinPaymentMethod}`);
+                    if (dto.sinPaymentMethod === 1) { // QR
+                        cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_QR');
+                    } else { // Tarjeta Debito/Crédito
+                        cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_TARJETA');
+                    }
+                    break;
+            }
+
+            // Si SAP Service Layer está configurado, procesar
+            if (this.sapServiceLayerService.isConfigured() && dto.orderLines?.length) {
+                try {
+                    notification.status = 'PROCESSING';
+                    await this.paymentNotificationRepo.save(notification);
+
+                    const parentCardCode = debtInfo?.parentCode || '';
+
+                    if (!parentCardCode) {
+                        throw new Error('No se pudo obtener el CardCode del padre');
+                    }
+
+                    const processData: ProcessPaymentDto = {
+                        transactionId: dto.transactionId,
+                        razonSocial: dto.razonSocial,
+                        nit: dto.nit,
+                        email: dto.email,
+                        sinPaymentMethod: dto.sinPaymentMethod,
+                        documentTypeIdentity: dto.documentTypeIdentity,
+                        complement: dto.complement,
+                        cuf: dto.cuf,
+                        cufd: dto.cufd,
+                        transferAccount: cuentaContableSap,
+                        parentCardCode,
+                        paymentDate: dto.paymentDate,
+                        amount: dto.amount,
+                        bankName: 'Servicio Externo',
+                        externalReference: dto.transactionId,
+                        orderLines: dto.orderLines.map(line => ({
+                            orderDocEntry: line.orderDocEntry,
+                            lineNum: line.lineNum,
+                        })),
+                    };
+
+                    const result = await this.sapServiceLayerService.processPaymentNotification(processData);
+
+                    if (result.success) {
+                        notification.status = 'PROCESSED';
+                        notification.sapSyncStatus = 'SYNCED';
+                        notification.sapInvoiceDocEntry = result.invoiceDocEntry;
+                        notification.sapInvoiceDocNum = result.invoiceDocNum;
+                        notification.sapPaymentDocEntry = result.paymentDocEntry;
+                        notification.sapPaymentDocNum = result.paymentDocNum;
+                        notification.processedAt = new Date();
+
+                        this.logger.log(`[${requestId}] Pago procesado exitosamente en SAP`);
+                    } else {
+                        notification.status = 'FAILED';
+                        notification.sapSyncStatus = 'ERROR';
+                        notification.sapSyncError = result.error;
+
+                        this.logger.error(`[${requestId}] Error en SAP: ${result.error}`);
+                    }
+                } catch (error) {
+                    this.logger.error(`[${requestId}] Error procesando en SAP: ${error.message}`);
+                    notification.status = 'FAILED';
+                    notification.sapSyncStatus = 'ERROR';
+                    notification.sapSyncError = error.message;
+                }
+            } else {
+                // Sin SAP Service Layer, marcar como procesado
+                notification.status = 'PROCESSED';
+                notification.processedAt = new Date();
+                this.logger.log(`[${requestId}] Notificación marcada como procesada (sin SAP SL)`);
+            }
+
+            await this.paymentNotificationRepo.save(notification);
+        } catch (error) {
+            this.logger.error(`[${requestId}] Error en procesamiento async: ${error.message}`);
+
+            try {
+                const notification = await this.paymentNotificationRepo.findOne({
+                    where: { externalTransactionId: dto.transactionId },
+                });
+
+                if (notification) {
+                    notification.status = 'FAILED';
+                    notification.sapSyncError = error.message;
+                    await this.paymentNotificationRepo.save(notification);
+                }
+            } catch (updateError) {
+                this.logger.error(`[${requestId}] Error actualizando notificación: ${updateError.message}`);
+            }
+        }
+    }
+
+    /**
+     * Procesar notificación de pago desde servicio externo (DEPRECATED - usar processPaymentNotificationAsync)
+     * Mantenuido para compatibilidad hacia atrás
      */
     async processPaymentNotification(
         dto: PaymentNotificationDto,
@@ -290,7 +477,45 @@ export class ExternalApiService {
     }
 
     /**
-     * Genera un request ID único para trazabilidad
+     * Obtener estado actual de una notificación
+     */
+    async getNotificationStatus(transactionId: string): Promise<PaymentConfirmation | null> {
+        const notification = await this.paymentNotificationRepo.findOne({
+            where: { externalTransactionId: transactionId },
+        });
+
+        if (!notification) {
+            return null;
+        }
+
+        return {
+            internalId: notification.id,
+            transactionId: notification.externalTransactionId,
+            status: notification.status as any,
+            processedAt: notification.processedAt?.toISOString(),
+            sapInvoiceDocNum: notification.sapInvoiceDocNum,
+            sapPaymentDocNum: notification.sapPaymentDocNum,
+            message: this.getStatusMessage(notification.status),
+        };
+    }
+
+    /**
+     * Obtener mensaje legible del estado
+     */
+    private getStatusMessage(status: string): string {
+        const messages: Record<string, string> = {
+            RECEIVED: 'Notificación recibida, pendiente de procesamiento',
+            PROCESSING: 'Procesando pago en SAP',
+            PROCESSED: 'Pago procesado exitosamente',
+            FAILED: 'Error en el procesamiento del pago',
+            ALREADY_PROCESSED: 'El pago ya fue procesado anteriormente',
+        };
+
+        return messages[status] || 'Estado desconocido';
+    }
+
+    /**
+     * Generates a request ID unique for traceability
      */
     generateRequestId(): string {
         return uuidv4();

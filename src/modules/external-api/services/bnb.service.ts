@@ -69,10 +69,6 @@ export class BnbService {
         this.logger.log('Autenticando antes de generar QR...');
         await this.authenticate();
 
-        if (currency === 'U') {
-            currency = 'USD';
-        }
-
         // Asegurar que amount sea numérico
         const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
         

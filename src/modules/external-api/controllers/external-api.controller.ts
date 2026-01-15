@@ -113,8 +113,12 @@ export class ExternalApiController {
     }
 
     /**
-     * Webhook: Notificación de pago realizado
+     * Webhook: Notificación de pago realizado (Asincrónico)
      * POST /api/external/payments/notify
+     * 
+     * Retorna inmediatamente con estado ACCEPTED.
+     * El procesamiento en SAP se realiza en background.
+     * El estado se actualiza en la BD según avance del procesamiento.
      */
     @Post('payments/notify')
     async notifyPayment(
@@ -122,23 +126,91 @@ export class ExternalApiController {
         @CurrentApiClient() client: ApiClient,
     ): Promise<ExternalApiResponse<any>> {
         const requestId = this.externalApiService.generateRequestId();
-        this.logger.log(`[${requestId}] ${client.name} - Notificación de pago: ${dto.transactionId}`);
+        this.logger.log(`[${requestId}] ${client.name} - Notificación de pago recibida: ${dto.transactionId}`);
 
         try {
-            const result = await this.externalApiService.processPaymentNotification(dto, client.id);
+            // Validar idempotencia de forma sincrónica
+            const existingNotification = await this.externalApiService.checkExistingNotification(dto.transactionId);
+            
+            if (existingNotification) {
+                this.logger.log(`[${requestId}] Pago ya procesado: ${dto.transactionId}`);
+                return this.createResponse(
+                    requestId,
+                    true,
+                    'ALREADY_PROCESSED',
+                    'El pago ya fue procesado anteriormente',
+                    existingNotification,
+                );
+            }
 
+            // Crear registro inicial de la notificación (sincrónico)
+            const initialNotification = await this.externalApiService.createInitialNotification(dto, client.id);
+
+            // Iniciar procesamiento en background (sin awaitar)
+            this.externalApiService.processPaymentNotificationAsync(dto, client.id, requestId).catch((error) => {
+                this.logger.error(`[${requestId}] Error en procesamiento async: ${error.message}`);
+            });
+
+            // Retornar inmediatamente con estado ACCEPTED
             return this.createResponse(
                 requestId,
-                result.status !== 'FAILED',
-                result.status === 'ALREADY_PROCESSED' ? 'ALREADY_PROCESSED' :
-                    result.status === 'PROCESSED' ? 'OK' :
-                        result.status === 'RECEIVED' ? 'ACCEPTED' : 'ERROR',
-                result.message,
-                result,
+                true,
+                'ACCEPTED',
+                'Notificación recibida.',
+                {
+                    internalId: initialNotification.id,
+                    transactionId: dto.transactionId,
+                    status: 'RECEIVED',
+                    message: 'En proceso con SAP',
+                },
             );
         } catch (error) {
             this.logger.error(`[${requestId}] Error: ${error.message}`);
-            return this.createResponse(requestId, false, 'ERROR', `Error procesando pago: ${error.message}`, null);
+            return this.createResponse(
+                requestId,
+                false,
+                'ERROR',
+                `Error al recibir notificación: ${error.message}`,
+                null,
+            );
+        }
+    }
+
+    /**
+     * Obtener estado actual de una notificación de pago
+     * GET /api/external/payments/:transactionId/status
+     */
+    @Get('payments/:transactionId/status')
+    async getPaymentStatus(
+        @Param('transactionId') transactionId: string,
+        @CurrentApiClient() client: ApiClient,
+    ): Promise<ExternalApiResponse<any>> {
+        const requestId = this.externalApiService.generateRequestId();
+        this.logger.log(`[${requestId}] Consultando estado de pago: ${transactionId}`);
+
+        try {
+            const notification = await this.externalApiService.getNotificationStatus(transactionId);
+
+            if (!notification) {
+                return this.createResponse(
+                    requestId,
+                    false,
+                    'NOT_FOUND',
+                    'Notificación no encontrada',
+                    null,
+                );
+            }
+
+            return this.createResponse(
+                requestId,
+                true,
+                'OK',
+                `Estado actual: ${notification.status}`,
+                notification,
+            );
+        } catch (error) {
+            this.logger.error(`[${requestId}] Error: ${error.message}`);
+            return this.createResponse(requestId, false, 'ERROR', 'Error consultando estado', null);
         }
     }
 

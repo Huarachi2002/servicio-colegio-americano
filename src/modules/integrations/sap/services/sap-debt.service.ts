@@ -78,7 +78,7 @@ export class SapDebtService {
             ),
             parentCode: String(xmlData.parentCode || ''),
             NombreDeudor: String(xmlData.NombreDeudor || ''),
-            MonedaDelCobro: xmlData.MonedaDelCobro === 'U' ? 'U' : 'B',
+            MonedaDelCobro: xmlData.MonedaDelCobro,
             MontoDelCobro: String(xmlData.MontoDelCobro || '0'),
             TipoCambio: xmlData.TipoCambio ? String(xmlData.TipoCambio) : undefined,
             DetalleDelCobro: {
@@ -112,20 +112,61 @@ export class SapDebtService {
                 : [];
 
         // Transformar cada detalle de deuda
-        const detalleDeuda: PendingDebtDetail[] = detalleDeudaArray.map((detalle) => ({
-            Facturable: String(detalle.Facturable || 'N'),
-            ConceptoDeuda: String(detalle.ConceptoDeuda || ''),
-            PeriodoDeuda: String(detalle.PeriodoDeuda || ''),
-            MultaDeuda: String(detalle.MultaDeuda || '0'),
-            DescuentoDeuda: String(detalle.DescuentoDeuda || '0'),
-            MontoDeuda: String(detalle.MontoDeuda || '0'),
-        }));
+        const detalleDeuda: PendingDebtDetail[] = detalleDeudaArray.map((detalle) => {
+            // detalle.PeriodoDeuda tiene formato "M - AAAA", extraer mes para posible uso futuro
+            const periodoMes: string = String(detalle.PeriodoDeuda).substring(0, detalle.PeriodoDeuda.indexOf(' '));
+            const periodoAnio: string = String(detalle.PeriodoDeuda).substring(detalle.PeriodoDeuda.indexOf('-') + 2);
+            let fechaVencimiento = '';
+            switch(periodoMes)
+            {
+                case '1':
+                    fechaVencimiento = `${periodoAnio}-01-15`;
+                    break;
+                case '2':
+                    fechaVencimiento = `${periodoAnio}-02-15`;
+                    break;
+                case '3':
+                    fechaVencimiento = `${periodoAnio}-03-15`;
+                    break;
+                case '4':
+                    fechaVencimiento = `${periodoAnio}-04-15`;
+                    break;
+                case '5':
+                    fechaVencimiento = `${periodoAnio}-05-15`;
+                    break;
+                case '6':
+                    fechaVencimiento = `${periodoAnio}-06-15`;
+                    break;
+                case '7':
+                    fechaVencimiento = `${periodoAnio}-07-15`;
+                    break;
+                case '8':
+                    fechaVencimiento = `${periodoAnio}-08-15`;
+                    break;
+                case '9':
+                    fechaVencimiento = `${periodoAnio}-09-15`;
+                    break;
+                case '10':
+                    fechaVencimiento = `${periodoAnio}-10-15`;
+                    break;
+                default:
+            }
+            return {
+                Facturable: String(detalle.Facturable || 'N'),
+                ConceptoDeuda: String(detalle.ConceptoDeuda || ''),
+                PeriodoDeuda: String(detalle.PeriodoDeuda || ''),
+                FechaVencimiento: fechaVencimiento,
+                MultaDeuda: String(detalle.MultaDeuda || '0'),
+                DescuentoDeuda: String(detalle.DescuentoDeuda || '0'),
+                MontoDeuda: String(detalle.MontoDeuda || '0'),
+            }
+    });
 
         return {
             idProceso: String(xmlData.idProceso || 'False'),
             MensajeProceso: String(xmlData.MensajeProceso || ''),
             NombreDeudor: String(xmlData.NombreDeudor || ''),
-            MonedaDeuda: xmlData.MonedaDeuda === 'U' ? 'U' : 'B',
+            MonedaDeuda: xmlData.MonedaDeuda || 'BOB',
             MontoDeuda: String(xmlData.MontoDeuda || '0'),
             DetalleDeuda: detalleDeuda,
         };
@@ -138,7 +179,7 @@ export class SapDebtService {
             idTransaccion: '0',
             parentCode: '',
             NombreDeudor: '',
-            MonedaDelCobro: 'U',
+            MonedaDelCobro: 'BOB',
             MontoDelCobro: '0',
             TipoCambio: '6.96',
             DetalleDelCobro: {
