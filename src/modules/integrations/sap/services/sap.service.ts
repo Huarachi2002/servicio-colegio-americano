@@ -65,7 +65,7 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
             );
 
             const request = this.pool.request();
-            request.input('studentErpCode', sql.VarChar(50), studentErpCode);
+            request.input('CodigoEstudiante', sql.VarChar(50), studentErpCode);
 
             // Ejecutar SP
             const result = await request.execute(procedureName);
