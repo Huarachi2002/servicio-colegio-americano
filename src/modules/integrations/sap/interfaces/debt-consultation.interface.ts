@@ -101,7 +101,7 @@ export interface PendingDebtConsultationResponse {
     NombreDeudor: string; // Nombre del estudiante/deudor
     RazonSocial?: string; // Nombre para facturación (opcional)
     Nit?: string; // NIT o CI para facturación (opcional)
-    MonedaDeuda: string; // U=USD, B=BOB
+    MonedaDeuda: string; // B=BOB
     MontoDeuda: string; // Monto total de deuda pendiente
     DetalleDeuda: PendingDebtDetail[]; // Array de detalles de deuda
 }
@@ -119,6 +119,8 @@ export interface PendingDebtConsultationResponse {
  * </DetalleDeuda>
  */
 export interface PendingDebtDetail {
+    IdTransaccion: string; // DocEntry de SAP
+    LinNum: string; // Número de línea en la deuda pendiente
     Facturable: string; // 'Y' o 'N' (Si es facturable)
     ConceptoDeuda: string; // Ej: "Mensualidad"
     PeriodoDeuda: string; // Ej: "2 - 2026" (mes - año)
@@ -132,7 +134,6 @@ export interface ConsultaDeudaXmlData {
     idProceso?: string | boolean;
     MensajeProceso?: string;
     idTransaccion?: string | number;
-    IdTransaccion?: string | number; // Variante de nombre
     parentCode?: string;
     NombreDeudor?: string;
     MonedaDelCobro?: string;
@@ -174,6 +175,8 @@ export interface ConsultaDeudaPendienteXmlData {
  * Detalle de deuda crudo del XML
  */
 export interface PendingDebtDetailXmlData {
+    IdTransaccion?: string | number;
+    LinNum?: string | number;
     Facturable?: string;
     ConceptoDeuda?: string;
     PeriodoDeuda?: string;

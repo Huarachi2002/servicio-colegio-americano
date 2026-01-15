@@ -73,9 +73,7 @@ export class SapDebtService {
         return {
             idProceso: String(xmlData.idProceso || 'False'),
             MensajeProceso: String(xmlData.MensajeProceso || ''),
-            idTransaccion: String(
-                xmlData.IdTransaccion || xmlData.idTransaccion || '0',
-            ),
+            idTransaccion: String(xmlData.idTransaccion || '0',),
             parentCode: String(xmlData.parentCode || ''),
             NombreDeudor: String(xmlData.NombreDeudor || ''),
             MonedaDelCobro: xmlData.MonedaDelCobro,
@@ -152,6 +150,8 @@ export class SapDebtService {
                 default:
             }
             return {
+                IdTransaccion: String(detalle.IdTransaccion || '0'),
+                LinNum: String(detalle.LinNum || '0'),
                 Facturable: String(detalle.Facturable || 'N'),
                 ConceptoDeuda: String(detalle.ConceptoDeuda || ''),
                 PeriodoDeuda: String(detalle.PeriodoDeuda || ''),

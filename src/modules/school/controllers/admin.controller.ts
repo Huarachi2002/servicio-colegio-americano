@@ -194,11 +194,14 @@ export class AdminController {
     async createApiClient(@Body() createApiClientDto: CreateApiClient): Promise<ApiResponseWeb<any>> {
         this.logger.log(`Creando nuevo cliente API con nombre: ${createApiClientDto.name}`);
         try {
-            const dataCreate = await this.adminService.createApiClient(createApiClientDto);
+            const { plainApiKey, ...dataCreate } = await this.adminService.createApiClient(createApiClientDto);
             return {
                 success: true,
                 message: 'Cliente API creado exitosamente',
-                data: dataCreate,
+                data: {
+                    dataCreate,
+                    apiKey: plainApiKey
+                }
             };
         } catch (error) {
             return {

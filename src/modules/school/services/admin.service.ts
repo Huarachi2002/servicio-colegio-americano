@@ -4,7 +4,6 @@ import { ApiClient } from "src/database/entities/api-client.entity";
 import { User } from "src/database/entities/users.entity";
 import { Repository } from "typeorm";
 import * as crypto from 'crypto';
-import * as bcrypt from 'bcrypt';
 import { CreateApiClient } from "../dto/create-api-client.dto";
 import { UpdateApiClient } from "../dto/update-api-client.dto";
 import { CreateUser } from "../dto/create-user.dto";
@@ -103,7 +102,7 @@ export class AdminService {
         return await this.apiClientRepository.find();
     }
 
-    async createApiClient(apiClient: CreateApiClient): Promise<ApiClient> {
+    async createApiClient(apiClient: CreateApiClient): Promise<ApiClient & { plainApiKey: string }> {
         this.logger.log(`Creando nuevo cliente API: ${apiClient.name}`);
 
         const existingClient = await this.apiClientRepository.findOne({ where: { name: apiClient.name } });
@@ -111,17 +110,21 @@ export class AdminService {
             throw new ConflictException(`Cliente API con nombre '${apiClient.name}' ya existe.`);
         }
 
-        const apiKeyHash = this.generateApiKeyHash();
+        // Generar API Key y su hash
+        const { plainApiKey, hashedApiKey } = this.generateApiKeyWithHash();
+        
         const dataCliente = {
             name: apiClient.name,
-            apiSecret: apiKeyHash,
+            apiSecret: hashedApiKey,
             allowedIps: apiClient.allowedIps || null,
             active: true,
             rateLimit: apiClient.rateLimit || 100
         }
 
         const newClient = this.apiClientRepository.create(dataCliente);
-        return await this.apiClientRepository.save(newClient);
+        const savedClient = await this.apiClientRepository.save(newClient);
+        
+        return Object.assign(savedClient, { plainApiKey });
     }
 
     async updateApiClient(id:number, apiClient: UpdateApiClient): Promise<ApiClient> {
@@ -154,10 +157,29 @@ export class AdminService {
         return activeExchangeRate.exchangeRate;
     }
 
-    private generateApiKeyHash(): string {
-        // Generar mediante un UUID o token generado
-        const apiKey = crypto.randomBytes(32).toString('hex');
-        const apiHash = bcrypt.hashSync(apiKey, 10);
-        return apiHash;
+    private generateApiKeyWithHash(): { plainApiKey: string; hashedApiKey: string } {
+        // Generar API Key aleatorio
+        const plainApiKey = crypto.randomBytes(32).toString('hex');
+        // Hashear con SHA256 para almacenar en BD (mismo hash siempre = búsqueda directa)
+        const hashedApiKey = crypto.createHash('sha256').update(plainApiKey).digest('hex');
+        return { plainApiKey, hashedApiKey };
+    }
+
+    /**
+     * Regenerar API Key para un cliente existente
+     * @returns El nuevo API Key en texto plano (solo visible una vez)
+     */
+    async regenerateApiKey(clientId: number): Promise<{ client: ApiClient; plainApiKey: string }> {
+        const client = await this.apiClientRepository.findOne({ where: { id: clientId } });
+        if (!client) {
+            throw new NotFoundException(`Cliente API con ID '${clientId}' no encontrado.`);
+        }
+
+        const { plainApiKey, hashedApiKey } = this.generateApiKeyWithHash();
+        client.apiSecret = hashedApiKey;
+        const savedClient = await this.apiClientRepository.save(client);
+
+        this.logger.log(`API Key regenerada para cliente: ${client.name}`);
+        return { client: savedClient, plainApiKey };
     }
 }

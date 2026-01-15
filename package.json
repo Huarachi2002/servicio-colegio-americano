@@ -22,7 +22,9 @@
     "migration:generate": "npm run typeorm -- migration:generate -d src/config/typeorm.config.ts",
     "migration:run": "npm run typeorm -- migration:run -d src/config/typeorm.config.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/config/typeorm.config.ts",
-    "migration:show": "npm run typeorm -- migration:show -d src/config/typeorm.config.ts"
+    "migration:show": "npm run typeorm -- migration:show -d src/config/typeorm.config.ts",
+    "seed": "ts-node -r tsconfig-paths/register src/database/seeders/seed.ts",
+    "seed:revert": "ts-node -r tsconfig-paths/register src/database/seeders/seed.ts revert"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
@@ -42,6 +44,7 @@
     "fast-xml-parser": "^5.3.2",
     "mssql": "^11.0.1",
     "passport": "^0.7.0",
+    "passport-custom": "^1.1.1",
     "passport-headerapikey": "^1.2.2",
     "passport-http-bearer": "^1.0.1",
     "passport-jwt": "^4.0.1",
