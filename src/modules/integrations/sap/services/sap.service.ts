@@ -88,9 +88,18 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
 
             // Parsear XML a objeto JavaScript
             const parsed = this.xmlParser.parse(xmlString);
+            
+            // Log para debug: ver la estructura del XML parseado
+            this.logger.debug(`Estructura parseada: ${JSON.stringify(Object.keys(parsed))}`);
 
-            // El objeto parseado tiene estructura: { root: { ...datos } }
-            return parsed;
+            // El XML tiene estructura: { ConsultaDeudaPendiente: { ...datos } }
+            // Extraer el contenido del elemento raíz
+            const rootKey = Object.keys(parsed)[0];
+            const data = parsed[rootKey] || parsed;
+            
+            this.logger.debug(`Root key: ${rootKey}, tiene DetalleDeuda: ${!!data.DetalleDeuda}`);
+
+            return data;
         } catch (error) {
             this.logger.error(
                 `Error ejecutando ${procedureName}: ${error.message}`,
