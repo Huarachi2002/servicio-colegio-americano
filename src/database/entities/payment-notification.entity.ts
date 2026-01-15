@@ -34,7 +34,7 @@ export class PaymentNotification {
     amount: number;
 
     @Column({ length: 3 })
-    currency: string;  // USD o BOB
+    currency: string; // BOB
 
     @Column({ name: 'payment_date', type: 'date' })
     paymentDate: Date;

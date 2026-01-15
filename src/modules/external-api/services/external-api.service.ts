@@ -256,10 +256,6 @@ export class ExternalApiService {
                         nit: dto.nit,
                         email: dto.email,
                         sinPaymentMethod: dto.sinPaymentMethod,
-                        documentTypeIdentity: dto.documentTypeIdentity,
-                        complement: dto.complement,
-                        cuf: dto.cuf,
-                        cufd: dto.cufd,
                         transferAccount: cuentaContableSap,
                         parentCardCode,
                         paymentDate: dto.paymentDate,
@@ -411,19 +407,13 @@ export class ExternalApiService {
                     throw new Error('No se pudo obtener el CardCode del padre');
                 }
 
-                // TODO: Re formar como obtener la cuenta contable
                 const processData: ProcessPaymentDto = {
                     transactionId: dto.transactionId,
                     razonSocial: dto.razonSocial,
                     nit: dto.nit,
                     email: dto.email,
                     sinPaymentMethod: dto.sinPaymentMethod,
-                    documentTypeIdentity: dto.documentTypeIdentity,
-                    complement: dto.complement,
-                    cuf: dto.cuf,
-                    cufd: dto.cufd,
                     transferAccount: cuentaContableSap,
-
                     parentCardCode,
                     paymentDate: dto.paymentDate,
                     amount: dto.amount,

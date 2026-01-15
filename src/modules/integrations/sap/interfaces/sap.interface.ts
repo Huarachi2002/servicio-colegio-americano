@@ -4,11 +4,6 @@ export interface CreateInvoiceDto {
     nit: string;
     email: string;
     sinPaymentMethod: number;
-    documentTypeIdentity: number;
-    complement?: string;
-    cuf?: string;
-    cufd?: string;
-
     parentCardCode: string;
     docDate: string;
     bankName: string;
@@ -51,12 +46,7 @@ export interface ProcessPaymentDto {
     nit: string;
     email: string;
     sinPaymentMethod: number;
-    documentTypeIdentity: number;
-    complement?: string;
-    cuf?: string;
-    cufd?: string;
     transferAccount: string;
-
     parentCardCode: string;
     paymentDate: string;
     amount: number;

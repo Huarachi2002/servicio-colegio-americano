@@ -36,27 +36,11 @@ export class PaymentNotificationDto {
     
     @IsOptional()
     @IsString()
-    email?: string;  
-    
-    @IsOptional()
-    @IsString()
-    cuf?: string;         
-    
-    @IsOptional()
-    @IsString()
-    cufd?: string;        
+    email?: string;       
     
     @IsNumber()
     sinPaymentMethod: number; 
-
-    @IsNumber()
-    @IsOptional()
-    documentTypeIdentity?: number;
-
-    @IsOptional()
-    @IsString()
-    complement?: string; 
-
+    
     @IsOptional()
     @IsArray()
     @ValidateNested({ each: true })
