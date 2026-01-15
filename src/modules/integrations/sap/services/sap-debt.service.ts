@@ -111,56 +111,71 @@ export class SapDebtService {
 
         // Transformar cada detalle de deuda
         const detalleDeuda: PendingDebtDetail[] = detalleDeudaArray.map((detalle) => {
+            // Convertir PeriodoDeuda a string antes de operar
+            const periodoDeudaStr = String(detalle.PeriodoDeuda || '');
+            
             // detalle.PeriodoDeuda tiene formato "M - AAAA", extraer mes para posible uso futuro
-            const periodoMes: string = String(detalle.PeriodoDeuda).substring(0, detalle.PeriodoDeuda.indexOf(' '));
-            const periodoAnio: string = String(detalle.PeriodoDeuda).substring(detalle.PeriodoDeuda.indexOf('-') + 2);
+            let periodoMes = '';
+            let periodoAnio = '';
             let fechaVencimiento = '';
-            switch(periodoMes)
-            {
-                case '1':
-                    fechaVencimiento = `${periodoAnio}-01-15`;
-                    break;
-                case '2':
-                    fechaVencimiento = `${periodoAnio}-02-15`;
-                    break;
-                case '3':
-                    fechaVencimiento = `${periodoAnio}-03-15`;
-                    break;
-                case '4':
-                    fechaVencimiento = `${periodoAnio}-04-15`;
-                    break;
-                case '5':
-                    fechaVencimiento = `${periodoAnio}-05-15`;
-                    break;
-                case '6':
-                    fechaVencimiento = `${periodoAnio}-06-15`;
-                    break;
-                case '7':
-                    fechaVencimiento = `${periodoAnio}-07-15`;
-                    break;
-                case '8':
-                    fechaVencimiento = `${periodoAnio}-08-15`;
-                    break;
-                case '9':
-                    fechaVencimiento = `${periodoAnio}-09-15`;
-                    break;
-                case '10':
-                    fechaVencimiento = `${periodoAnio}-10-15`;
-                    break;
-                default:
+            
+            if (periodoDeudaStr && periodoDeudaStr.includes(' - ')) {
+                periodoMes = periodoDeudaStr.substring(0, periodoDeudaStr.indexOf(' '));
+                periodoAnio = periodoDeudaStr.substring(periodoDeudaStr.indexOf('-') + 2);
+                
+                switch(periodoMes) {
+                    case '1':
+                        fechaVencimiento = `${periodoAnio}-01-15`;
+                        break;
+                    case '2':
+                        fechaVencimiento = `${periodoAnio}-02-15`;
+                        break;
+                    case '3':
+                        fechaVencimiento = `${periodoAnio}-03-15`;
+                        break;
+                    case '4':
+                        fechaVencimiento = `${periodoAnio}-04-15`;
+                        break;
+                    case '5':
+                        fechaVencimiento = `${periodoAnio}-05-15`;
+                        break;
+                    case '6':
+                        fechaVencimiento = `${periodoAnio}-06-15`;
+                        break;
+                    case '7':
+                        fechaVencimiento = `${periodoAnio}-07-15`;
+                        break;
+                    case '8':
+                        fechaVencimiento = `${periodoAnio}-08-15`;
+                        break;
+                    case '9':
+                        fechaVencimiento = `${periodoAnio}-09-15`;
+                        break;
+                    case '10':
+                        fechaVencimiento = `${periodoAnio}-10-15`;
+                        break;
+                    case '11':
+                        fechaVencimiento = `${periodoAnio}-11-15`;
+                        break;
+                    case '12':
+                        fechaVencimiento = `${periodoAnio}-12-15`;
+                        break;
+                    default:
+                        fechaVencimiento = '';
+                }
             }
             return {
                 IdTransaccion: String(detalle.IdTransaccion || '0'),
-                LinNum: String(detalle.LinNum || '0'),
+                LinNum: String(detalle.LinNum || detalle.LinNum || '0'),
                 Facturable: String(detalle.Facturable || 'N'),
                 ConceptoDeuda: String(detalle.ConceptoDeuda || ''),
-                PeriodoDeuda: String(detalle.PeriodoDeuda || ''),
+                PeriodoDeuda: periodoDeudaStr,
                 FechaVencimiento: fechaVencimiento,
                 MultaDeuda: String(detalle.MultaDeuda || '0'),
                 DescuentoDeuda: String(detalle.DescuentoDeuda || '0'),
                 MontoDeuda: String(detalle.MontoDeuda || '0'),
             }
-    });
+        });
 
         return {
             idProceso: String(xmlData.idProceso || 'False'),
