@@ -8,7 +8,7 @@ import {
     PendingDebtDetail,
     ConsultaDeudaXmlData,
     ConsultaDeudaPendienteXmlData,
-} from './interfaces/debt-consultation.interface';
+} from '../interfaces/debt-consultation.interface';
 
 @Injectable()
 export class SapDebtService {

@@ -1,13 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import axios from 'axios';
 import { Payment } from '../../../database/entities/payment.entity';
 import { ExchangeRate } from '../../../database/entities/exchange-rate.entity';
 import { BnbService } from 'src/modules/external-api/services/bnb.service';
-import { DebtConsultationResponse } from '../../integrations/sap/interfaces/debt-consultation.interface';
-import * as fs from 'fs';
-import * as path from 'path';
 
 /**
  * PaymentService - Replica exacta de PaymentRepository de Laravel
@@ -16,9 +12,6 @@ import * as path from 'path';
 @Injectable()
 export class PaymentService {
     private readonly logger = new Logger(PaymentService.name);
-    private readonly BNB_BASE_URL = 'https://marketapi.bnb.com.bo';
-    private readonly BNB_ACCOUNT_ID = 'g7DEvMw2qBviGg51A0e4Ug==';
-    private readonly BNB_AUTHORIZATION_ID = 'PtmN+CwInC8cJ0BDZPACTg==';
     private authToken: {
         token: string;
         datetime: Date;
@@ -202,65 +195,6 @@ export class PaymentService {
         return (Math.round(converted * 100) / 100).toFixed(2);
     }
 
-    /**
-     * Login en API BNB
-     * Replica: PaymentRepository::Login()
-     */
-    private async loginBnb(): Promise<string> {
-        try {
-            const response = await axios.post(
-                `${this.BNB_BASE_URL}/ClientAuthentication.API/api/v1/auth/token`,
-                {
-                    accountId: this.BNB_ACCOUNT_ID,
-                    authorizationId: this.BNB_AUTHORIZATION_ID,
-                },
-            );
-
-            return response.data.message;
-        } catch (error) {
-            this.logger.error('Error logging in to BNB:', error.message);
-            throw error;
-        }
-    }
-
-    /**
-     * Obtener token de autorización (con cache de 30 minutos)
-     * Replica: PaymentRepository::getAuthorization()
-     */
-    private async getAuthorization(login: boolean = false): Promise<string> {
-        if (login) {
-            const token = await this.loginBnb();
-            this.authToken = {
-                token,
-                datetime: new Date(),
-            };
-
-            // Guardar en archivo (opcional, Laravel lo hace)
-            // this.saveAuthToFile(this.authToken);
-
-            return `Bearer ${token}`;
-        }
-
-        // Verificar si hay token cacheado válido
-        if (this.authToken) {
-            const now = new Date();
-            const tokenTime = new Date(this.authToken.datetime);
-            const diffMinutes =
-                (now.getTime() - tokenTime.getTime()) / 1000 / 60;
-
-            if (diffMinutes < 30) {
-                return `Bearer ${this.authToken.token}`;
-            }
-        }
-
-        // Token expirado, renovar
-        return this.getAuthorization(true);
-    }
-
-    /**
-     * Retornar respuesta estática cuando no hay deuda
-     * Replica: PaymentRepository::getStaticPending()
-     */
     getStaticPending(): any {
         return {
             idProceso: '',

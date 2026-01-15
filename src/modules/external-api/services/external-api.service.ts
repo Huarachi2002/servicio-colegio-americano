@@ -3,19 +3,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { PaymentNotification } from '../../../database/entities/payment-notification.entity';
-import { SapService } from '../../integrations/sap/sap.service';
-import { SapDebtService } from '../../integrations/sap/sap-debt.service';
-import { SapServiceLayerService } from '../../integrations/sap/sap-service-layer.service';
+import { SapService } from '../../integrations/sap/services/sap.service';
+import { SapDebtService } from '../../integrations/sap/services/sap-debt.service';
+import { SapServiceLayerService } from '../../integrations/sap/services/sap-service-layer.service';
 import { PaymentNotificationDto } from '../dto/payment-notification.dto';
 import {
     DebtorInfo,
-    DebtListItem,
-    DebtDetail,
     PaymentConfirmation,
 } from '../interfaces/external-api-response.interface';
 import { DebtConsultationResponse, PendingDebtConsultationResponse } from 'src/modules/integrations/sap/interfaces/debt-consultation.interface';
 import { ProcessPaymentDto } from 'src/modules/integrations/sap/interfaces/sap.interface';
 import { ApiClient } from 'src/database/entities/api-client.entity';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * Servicio para la API externa (bancos y servicios externos)
@@ -32,6 +31,7 @@ export class ExternalApiService {
         private readonly sapService: SapService,
         private readonly sapDebtService: SapDebtService,
         private readonly sapServiceLayerService: SapServiceLayerService,
+        private readonly configService: ConfigService,
     ) { }
 
     /**
@@ -51,7 +51,7 @@ export class ExternalApiService {
                     T1.Name as StudentName
                 FROM OCRD T0
                 INNER JOIN OCPR T1 ON T0.CardCode = T1.CardCode
-                WHERE T0.LicTradNum = '${document}'
+                WHERE (T0.LicTradNum = '${document}' OR T0.CardCode = '${document}')
                 AND T0.CardType = 'C'
             `;
 
@@ -172,8 +172,23 @@ export class ExternalApiService {
             throw new Error(`Cliente API con ID ${apiClientId} no encontrado`);
         }
 
-        if (!apiClient.cuentaContableSap) {
-            throw new Error(`El Cliente API ${apiClient.name} no tiene cuenta contable SAP configurada`);
+        let cuentaContableSap = '';
+        this.logger.log(`[${requestId}] Obteniendo cuenta contable SAP para cliente API: ${apiClient.name}`);
+        switch (apiClient.name) {
+            case 'BNB':
+                cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BNB');
+                break;
+            case 'BG':
+                cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BG');
+                break;
+            case 'LUKA':
+                this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${dto.sinPaymentMethod}`);
+                if (dto.sinPaymentMethod === 1){ // QR
+                    cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_QR');
+                }else{ // Tarjeta
+                    cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_TARJETA');
+                }
+                break;
         }
 
         // Obtener información del estudiante para conseguir CardCode del padre
@@ -209,6 +224,7 @@ export class ExternalApiService {
                     throw new Error('No se pudo obtener el CardCode del padre');
                 }
 
+                // TODO: Re formar como obtener la cuenta contable
                 const processData: ProcessPaymentDto = {
                     transactionId: dto.transactionId,
                     razonSocial: dto.razonSocial,
@@ -219,7 +235,7 @@ export class ExternalApiService {
                     complement: dto.complement,
                     cuf: dto.cuf,
                     cufd: dto.cufd,
-                    transferAccount: apiClient.cuentaContableSap,
+                    transferAccount: cuentaContableSap,
 
                     parentCardCode,
                     paymentDate: dto.paymentDate,

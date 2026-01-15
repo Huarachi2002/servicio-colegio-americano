@@ -1,24 +1,15 @@
 import { Body, Controller, Get, Headers, HttpException, HttpStatus, Post } from "@nestjs/common";
 import { DeviceService } from "../services/device.service";
 import { DeviceStoreDto } from "../dto/device-store.dto";
-import { ApiResponse } from "src/common/interfaces/api-response.interface";
+import { ApiResponseMovil } from "src/common/interfaces/api-response-movil.interface";
 import { DeviceUpdateDto } from "../dto/device-update.dto";
 
 @Controller()
 export class DeviceController {
     constructor(private readonly deviceService: DeviceService) { }
 
-    @Get('health')
-    healthCheck() {
-        return {
-            status: 'ok',
-            timestamp: new Date().toISOString(),
-            service: 'dms2-nest',
-        };
-    }
-
     @Post('device')
-    async store(@Body() deviceDto: DeviceStoreDto): Promise<ApiResponse> {
+    async store(@Body() deviceDto: DeviceStoreDto): Promise<ApiResponseMovil> {
 
         try {
             const newDevice = await this.deviceService.storeDevice(deviceDto);
@@ -41,7 +32,7 @@ export class DeviceController {
     }
 
     @Post('update_device_token')
-    async update(@Body() deviceDto: DeviceUpdateDto): Promise<ApiResponse> {
+    async update(@Body() deviceDto: DeviceUpdateDto): Promise<ApiResponseMovil> {
 
         try {
             const updatedDevice = await this.deviceService.updateModel(deviceDto);

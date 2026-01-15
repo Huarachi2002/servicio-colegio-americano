@@ -4,7 +4,10 @@ import {
     PrimaryGeneratedColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    OneToOne,
+    JoinColumn,
 } from 'typeorm';
+import { MobileUser } from './mobile-user.entity';
 
 @Entity('devices')
 export class Device {
@@ -22,6 +25,11 @@ export class Device {
 
     @Column({ nullable: true, name: 'entity_type' })
     entityType: string;
+    
+    // Relacion 1 a 1 con mobile user
+    @OneToOne(() => MobileUser)
+    @JoinColumn({ name: 'mobile_user_id' })
+    mobileUser: MobileUser;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;

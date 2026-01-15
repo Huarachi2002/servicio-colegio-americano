@@ -4,7 +4,10 @@ import {
     PrimaryGeneratedColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    OneToOne,
+    JoinColumn,
 } from 'typeorm';
+import { Device } from './device.entity';
 
 @Entity('mobile_users')
 export class MobileUser {
@@ -24,13 +27,17 @@ export class MobileUser {
     password: string;
 
     @Column({ name: 'entity_id' })
-    entity_id: number;
+    entity_id: number; // id del padre - empleado - estudiante
 
     @Column({ name: 'entity_type' })
-    entity_type: string;
+    entity_type: string; // 'father' | 'employee' | 'student'
 
-    @Column({ name: 'user_type' })
-    user_type: number;
+    // @Column({ name: 'user_type' })
+    // user_type: number;
+
+    @OneToOne(() => Device)
+    @JoinColumn({ name: 'device_id' })
+    device: Device;
 
     @Column({ nullable: true })
     api_token: string;

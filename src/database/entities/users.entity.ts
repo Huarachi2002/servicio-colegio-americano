@@ -29,8 +29,8 @@ export class User {
     @Column()
     type: string;
 
-    @Column({ nullable: true })
-    api_token: string;
+    // @Column({ nullable: true })
+    // api_token: string;
 
     @ManyToOne(() => Rol, (rol) => rol.users)
     @JoinColumn({ name: 'role_id' })

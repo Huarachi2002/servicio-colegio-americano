@@ -9,19 +9,15 @@ import { AuthService } from './services/auth.service';
 import { DeviceService } from './services/device.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { MobileUser } from '../../database/entities/mobile-user.entity';
-import { Father } from '../../database/entities/father.entity';
-import { Employee } from '../../database/entities/employee.entity';
+import { User } from '../../database/entities/users.entity';
 import { Device } from '../../database/entities/device.entity';
 
 @Module({
     imports: [
-        // Entities que necesitamos
-        TypeOrmModule.forFeature([MobileUser, Father, Employee, Device]),
+        TypeOrmModule.forFeature([MobileUser, User, Device]),
 
-        // Passport con estrategia por defecto
-        PassportModule.register({ defaultStrategy: 'mobile-api' }),
+        PassportModule.register({ defaultStrategy: 'jwt' }),
 
-        // Configuración JWT
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({
@@ -35,6 +31,10 @@ import { Device } from '../../database/entities/device.entity';
     ],
     controllers: [AuthController, DeviceController],
     providers: [AuthService, DeviceService, JwtStrategy],
-    exports: [AuthService, JwtStrategy, PassportModule],
+    exports: [
+        AuthService,    
+        JwtStrategy,    
+        PassportModule, 
+    ],
 })
 export class AuthModule { }

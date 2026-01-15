@@ -1,5 +1,5 @@
-import { Controller, Post, Body, Get, Param, Query, UseGuards, Logger } from '@nestjs/common';
-import { SapSyncService } from '../sap-sync.service';
+import { Controller, Post, Body, Get, Param, Query, Logger } from '@nestjs/common';
+import { SapSyncService } from '../services/sap-sync.service';
 import { SyncSingleUserDto, SyncUsersFilterDto } from '../dto/sync-user.dto';
 
 /**

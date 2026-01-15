@@ -1,6 +1,3 @@
-/**
- * Interfaces para respuestas de la API externa
- */
 
 export interface ExternalApiResponse<T> {
     success: boolean;

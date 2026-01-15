@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as sql from 'mssql';
 import { XMLParser } from 'fast-xml-parser';
-import { ConsultaDeudaPendienteXmlData, ConsultaDeudaXmlData } from './interfaces/debt-consultation.interface';
+import { ConsultaDeudaPendienteXmlData, ConsultaDeudaXmlData } from '../interfaces/debt-consultation.interface';
 
 /**
  * Servicio de conexión con SQL Server para SAP

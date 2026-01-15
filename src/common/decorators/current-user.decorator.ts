@@ -1,12 +1,10 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { MobileUser } from '../../database/entities/mobile-user.entity';
+import { User } from '../../database/entities/users.entity';
 
-/**
- * Decorador para obtener el usuario autenticado actual
- * Uso: @CurrentUser() user: MobileUser
- */
 export const CurrentUser = createParamDecorator(
-    (datakey: unknown, ctx: ExecutionContext) => {
+    (data: unknown, ctx: ExecutionContext): MobileUser | User => {
         const request = ctx.switchToHttp().getRequest();
-        return request.user; // Usuario autenticado por Passport
+        return request.user; // Usuario autenticado por JwtStrategy
     },
 );

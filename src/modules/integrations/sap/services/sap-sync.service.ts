@@ -239,7 +239,6 @@ export class SapSyncService {
                     password: hashedPassword,
                     entity_id: father.id,
                     entity_type: 'Father',
-                    user_type: 1, // FATHER
                     state: bp.ValidFor === 'Y' ? 1 : 0,
                 });
                 

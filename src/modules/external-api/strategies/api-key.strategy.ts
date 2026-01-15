@@ -40,7 +40,7 @@ export class ApiKeyStrategy extends PassportStrategy(Strategy, 'api-key') {
             }
 
             const client = await this.apiClientRepository.findOne({
-                where: { apiKey, active: true },
+                where: { apiSecret: apiKey, active: true },
             });
 
             if (!client) {

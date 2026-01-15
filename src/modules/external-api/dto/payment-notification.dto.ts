@@ -14,7 +14,6 @@ export class PaymentNotificationDto {
     studentCode: string;  // CntctCode del estudiante
 
     @IsNumber()
-    @Min(0.01)
     amount: number;  // Monto pagado
 
     @IsString()

@@ -6,9 +6,9 @@ import { Father } from '../../../database/entities/father.entity';
 import { Grade } from '../../../database/entities/grade.entity';
 import { Parallel } from '../../../database/entities/parallel.entity';
 import { ExchangeRate } from '../../../database/entities/exchange-rate.entity';
-import { SapDebtService } from '../../integrations/sap/sap-debt.service';
+import { SapDebtService } from '../../integrations/sap/services/sap-debt.service';
 import { PaymentService } from './payment.service';
-import { SapService } from '../../integrations/sap/sap.service';
+import { SapService } from '../../integrations/sap/services/sap.service';
 
 /**
  * SchoolService - Replica la lógica de SchoolApiService de Laravel

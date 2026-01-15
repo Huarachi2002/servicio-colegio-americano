@@ -1,23 +1,18 @@
-import { Body, Controller, Get, Headers, HttpException, HttpStatus, Post } from "@nestjs/common";
+import { Body, Controller, Get, Headers, HttpException, HttpStatus, Logger, Post } from "@nestjs/common";
 import { AuthService } from "../services/auth.service";
 import { LoginDto } from "../dto/login.dto";
-import { ApiResponse } from "src/common/interfaces/api-response.interface";
+import { ApiResponseMovil } from "src/common/interfaces/api-response-movil.interface";
+import { ApiResponseWeb } from "src/common/interfaces/api-response-web.interface";
 
 @Controller()
 export class AuthController {
-    constructor(private readonly authService: AuthService) { }
-
-    @Get('health')
-    healthCheck() {
-        return {
-            status: 'ok',
-            timestamp: new Date().toISOString(),
-            service: 'dms2-nest',
-        };
-    }
+    private readonly logger = new Logger(AuthController.name);
+    constructor(
+        private readonly authService: AuthService
+    ) { }
 
     @Post('login')
-    async login(@Body() loginDto: LoginDto, @Headers('device-token') deviceToken?: string): Promise<ApiResponse> {
+    async login(@Body() loginDto: LoginDto, @Headers('device-token') deviceToken?: string): Promise<ApiResponseMovil> {
 
         try {
             // Intenta autenticas al usuario
@@ -49,5 +44,23 @@ export class AuthController {
         }
     }
 
-
+    @Post('login-web')
+    async loginWeb(@Body() loginDto: LoginDto): Promise<ApiResponseWeb<any>> {
+        this.logger.log('Received web login request for username: ' + loginDto.username);
+        try {
+            const apiToken = await this.authService.loginWeb(loginDto);
+            return {
+                success: true,
+                message: 'Login successful',
+                data: { apiToken }
+            }
+        } catch (error) {
+            this.logger.error('Credenciales Invalidas');
+            return {
+                success: false,
+                message: error.message,
+                data: null
+            };
+        }
+    }
 }

@@ -18,8 +18,8 @@ export class ApiClient {
     @Column({ unique: true, length: 100 })
     name: string;  // "BNB", "Banco Union", etc.
 
-    @Column({ name: 'api_key', unique: true, length: 64 })
-    apiKey: string;  // UUID o token generado
+    // @Column({ name: 'api_key', unique: true, length: 64 })
+    // apiKey: string;  // UUID o token generado
 
     @Column({ name: 'api_secret', length: 128 })
     apiSecret: string;  // Hash del secret
@@ -33,8 +33,8 @@ export class ApiClient {
     @Column({ name: 'rate_limit', default: 100 })
     rateLimit: number;  // Requests por minuto
 
-    @Column({ name: 'cuenta_contable_sap', type: 'text'})
-    cuentaContableSap: string;
+    // @Column({ name: 'cuenta_contable_sap', type: 'text'})
+    // cuentaContableSap: string;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;

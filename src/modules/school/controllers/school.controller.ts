@@ -9,23 +9,24 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { SchoolService } from '../services/school.service';
-import { MobileAuthGuard } from '../../../common/guards/mobile-auth.guard';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { MobileUser } from '../../../database/entities/mobile-user.entity';
-import { ApiResponse } from '../../../common/interfaces/api-response.interface';
+import { ApiResponseMovil } from '../../../common/interfaces/api-response-movil.interface';
 import { StudentCodeDto } from '../../integrations/sap/dto/student-code.dto';
 import { GenerateQrDto } from '../dto/generate-qr.dto';
-import { BnbService } from 'src/modules/external-api/services/bnb.service';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * SchoolController - Replica de SchoolApiController de Laravel
  * Endpoints para la app móvil
+ * Usa JwtAuthGuard unificado que valida tokens de usuarios móviles
  */
 @Controller()
 export class SchoolController {
     constructor(
         private readonly schoolService: SchoolService,
-        private readonly bnbService: BnbService
+        private readonly configService: ConfigService,
     ) { }
 
     /**
@@ -33,10 +34,10 @@ export class SchoolController {
      * Consulta de deuda principal
      */
     @Post('debt_consultation') // Deuda mas antigua (mas prioritaria)
-    @UseGuards(MobileAuthGuard)
+    @UseGuards(JwtAuthGuard)
     async debtConsultation(
         @Body() dto: StudentCodeDto,
-    ): Promise<ApiResponse> {
+    ): Promise<ApiResponseMovil> {
         try {
             const debtInfo = await this.schoolService.getDebtConsultation(
                 dto.studentErpCode,
@@ -60,10 +61,10 @@ export class SchoolController {
      * Consulta de deuda pendiente
      */
     @Post('pending_debt_consultation') // Lista de deudas pendiente
-    @UseGuards(MobileAuthGuard)
+    @UseGuards(JwtAuthGuard)
     async pendingDebtConsultation(
         @Body() dto: StudentCodeDto,
-    ): Promise<ApiResponse> {
+    ): Promise<ApiResponseMovil> {
         try {
             const debtInfo =
                 await this.schoolService.getPendingDebtConsultation(
@@ -90,8 +91,8 @@ export class SchoolController {
      * Generar QR para pago (usa API BNB)
      */
     @Post('generate_qr')
-    @UseGuards(MobileAuthGuard)
-    async generateQr(@Body() dto: GenerateQrDto): Promise<ApiResponse> {
+    @UseGuards(JwtAuthGuard)
+    async generateQr(@Body() dto: GenerateQrDto): Promise<ApiResponseMovil> {
         try {
             const qrCode = await this.schoolService.savePaymentInformation(
                 dto.erp_code,
@@ -124,8 +125,8 @@ export class SchoolController {
      * Obtener tipo de cambio actual
      */
     @Get('exchange_rate')
-    @UseGuards(MobileAuthGuard)
-    async getExchangeRate(): Promise<ApiResponse> {
+    @UseGuards(JwtAuthGuard)
+    async getExchangeRate(): Promise<ApiResponseMovil> {
         try {
             const rate = await this.schoolService.getExchangeRate();
 
@@ -155,10 +156,10 @@ export class SchoolController {
      * Obtener estudiantes del padre autenticado
      */
     @Post('students')
-    @UseGuards(MobileAuthGuard)
+    @UseGuards(JwtAuthGuard)
     async getStudents(
         @CurrentUser() user: MobileUser,
-    ): Promise<ApiResponse> {
+    ): Promise<ApiResponseMovil> {
         try {
             const students = await this.schoolService.getStudentsByFatherId(
                 user.entity_id,
@@ -190,8 +191,8 @@ export class SchoolController {
      * Obtener todos los grados
      */
     @Post('grades')
-    @UseGuards(MobileAuthGuard)
-    async getGrades(): Promise<ApiResponse> {
+    @UseGuards(JwtAuthGuard)
+    async getGrades(): Promise<ApiResponseMovil> {
         try {
             const grades = await this.schoolService.getGrades();
 
@@ -221,8 +222,8 @@ export class SchoolController {
      * Obtener todos los paralelos
      */
     @Post('parallels')
-    @UseGuards(MobileAuthGuard)
-    async getParallels(): Promise<ApiResponse> {
+    @UseGuards(JwtAuthGuard)
+    async getParallels(): Promise<ApiResponseMovil> {
         try {
             const parallels = await this.schoolService.getParallels();
 
@@ -244,10 +245,10 @@ export class SchoolController {
      * Obtener anotaciones y ausencias del estudiante
      */
     @Post('annotation')
-    @UseGuards(MobileAuthGuard)
+    @UseGuards(JwtAuthGuard)
     async getAnnotations(
         @Body() dto: StudentCodeDto,
-    ): Promise<ApiResponse> {
+    ): Promise<ApiResponseMovil> {
         try {
             const data = await this.schoolService.getAnnotationsAndAbsences(
                 dto.studentErpCode,
@@ -271,8 +272,8 @@ export class SchoolController {
      * Obtener ERP code del padre por ID
      */
     @Get('father/:id')
-    @UseGuards(MobileAuthGuard)
-    async getFather(@Param('id') id: string): Promise<ApiResponse> {
+    @UseGuards(JwtAuthGuard)
+    async getFather(@Param('id') id: string): Promise<ApiResponseMovil> {
         try {
             const erpCode = await this.schoolService.getFatherById(
                 parseInt(id),
@@ -298,7 +299,7 @@ export class SchoolController {
     @Get('debt_state/:erpCode')
     async getDebtState(
         @Param('erpCode') erpCode: string,
-    ): Promise<ApiResponse> {
+    ): Promise<ApiResponseMovil> {
         try {
             const debtState = await this.schoolService.getDebtState(erpCode);
 
@@ -337,13 +338,13 @@ export class SchoolController {
      * Obtener última versión de la app (público)
      */
     @Get('app_last_version')
-    async getAppLastVersion(): Promise<ApiResponse> {
+    async getAppLastVersion(): Promise<ApiResponseMovil> {
         return {
             status: 'success',
             message: 'App versions retrieved',
             data: {
-                apk_version: process.env.APK_VERSION || '1.0.0', // Configurar en .env
-                ipa_version: process.env.IPA_VERSION || '1.0.0', // Configurar en .env
+                apk_version: this.configService.get<string>('APK_VERSION') || '1.0.0', // Configurar en .env
+                ipa_version: this.configService.get<string>('IPA_VERSION') || '1.0.0', // Configurar en .env
             },
         };
     }
@@ -353,11 +354,11 @@ export class SchoolController {
      * Obtener URL de noticias (público)
      */
     @Get('news_url')
-    async getNewsUrl(): Promise<ApiResponse> {
+    async getNewsUrl(): Promise<ApiResponseMovil> {
         return {
             status: 'success',
             message: 'News URL retrieved',
-            data: process.env.NEWS_URL || 'https://sccs.edu.bo/',
+            data: this.configService.get<string>('NEWS_URL') || 'https://sccs.edu.bo/',
         };
     }
 }

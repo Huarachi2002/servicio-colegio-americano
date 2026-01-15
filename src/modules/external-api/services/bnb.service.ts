@@ -19,7 +19,7 @@ export class BnbService {
             const url = `${this.configService.get('BNB_API_URL')}/ClientAuthentication.API/api/v1/auth/token`;
             const body = {
                 accountId: this.configService.get('BNB_ACCOUNT_ID'),
-                accountPassword: this.configService.get('BNB_AUTH_ID'),
+                authorizationId: this.configService.get('BNB_AUTH_ID'),
             };
 
             this.logger.log(`Autenticando con BNB: ${url}`);
@@ -60,17 +60,28 @@ export class BnbService {
 
     async generateQR(
         additionalData: any,
-        amount: number,
+        amount: number | string,
         gloss: string,
         currency: string = 'BOB',
         expirationDate: string
     ): Promise<any> {
-        if (!this.token) {
-            await this.authenticate();
-        }
+        // Siempre autenticar antes de generar QR para asegurar token válido
+        this.logger.log('Autenticando antes de generar QR...');
+        await this.authenticate();
 
         if (currency === 'U') {
             currency = 'USD';
+        }
+
+        // Asegurar que amount sea numérico
+        const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+        
+        if (isNaN(numericAmount) || numericAmount <= 0) {
+            this.logger.error(`Monto inválido: ${amount}`);
+            throw new HttpException(
+                'El monto debe ser un número mayor a 0',
+                HttpStatus.BAD_REQUEST
+            );
         }
 
         try {
@@ -79,7 +90,7 @@ export class BnbService {
             const body = {
                 currency,
                 gloss,
-                amount,
+                amount: numericAmount,
                 singleUse: true,
                 expirationDate,
                 additionalData: JSON.stringify(additionalData),
@@ -90,22 +101,50 @@ export class BnbService {
 
             const headers = { Authorization: `Bearer ${this.token}` };
             const response = await lastValueFrom(this.httpService.post(url, body, { headers }));
-            this.logger.log('QR generado con datos: ', response.data);
+            this.logger.log('QR generado exitosamente');
+            this.logger.debug('Respuesta BNB: ', response.data);
 
             if (response.data.success && response.data.qr) {
                 return response.data;
             } else {
-                // Si falla por token expirado (401)
-                this.logger.warn('Fallo generando QR, reintentando auth...');
-                await this.authenticate();
-                const retryResponse = await lastValueFrom(this.httpService.post(url, body, {
-                    headers: { Authorization: `Bearer ${this.token}` }
-                }));
-                return retryResponse.data;
+                this.logger.error('BNB respondió sin éxito:', response.data);
+                throw new HttpException(
+                    `BNB no generó QR: ${response.data.message || 'Error desconocido'}`,
+                    HttpStatus.BAD_GATEWAY
+                );
             }
         } catch (error) {
-            this.logger.error('Error generando QR', error);
-            throw new HttpException('No se pudo generar el QR bancario', HttpStatus.BAD_GATEWAY);
+            this.logger.error('Error generando QR');
+            
+            // Log detallado del error
+            if (error.response) {
+                this.logger.error(`Status: ${error.response.status}`);
+                this.logger.error(`Data: ${JSON.stringify(error.response.data)}`);
+                
+                // Si es error 401, el token no es válido
+                if (error.response.status === 401) {
+                    this.logger.error('Error 401: Token de BNB no válido o expirado');
+                    throw new HttpException(
+                        'Error de autenticación con BNB. Verifique las credenciales.',
+                        HttpStatus.BAD_GATEWAY
+                    );
+                }
+            } else if (error.request) {
+                this.logger.error('No se recibió respuesta de BNB');
+                this.logger.error(`Error: ${error.message}`);
+            } else {
+                this.logger.error(`Error: ${error.message}`);
+            }
+            
+            // Si ya es HttpException, relanzarla
+            if (error instanceof HttpException) {
+                throw error;
+            }
+            
+            throw new HttpException(
+                `No se pudo generar el QR bancario: ${error.message}`,
+                HttpStatus.BAD_GATEWAY
+            );
         }
     }
 }
