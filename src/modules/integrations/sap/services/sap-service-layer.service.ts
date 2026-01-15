@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
-import { CreateInvoiceDto, CreatePaymentDto, PaymentProcessResult, ProcessPaymentDto, SapDocumentResponse } from './interfaces/sap.interface';
+import { CreateInvoiceDto, CreatePaymentDto, PaymentProcessResult, ProcessPaymentDto, SapDocumentResponse } from '../interfaces/sap.interface';
 
 @Injectable()
 export class SapServiceLayerService {
@@ -72,22 +72,22 @@ export class SapServiceLayerService {
                 U_TIPODOC: 7,
                 U_RAZSOC: data.razonSocial,
                 U_NIT: data.nit,
-                U_EMAIL: data.email,
-                U_B_paymeth: data.sinPaymentMethod,
-                U_B_dni_type: data.documentTypeIdentity,
-                U_B_compl: data.complement || '',
-                U_TOKENSFE: data.transactionId,
+                // U_EMAIL: data.email,
+                // U_B_paymeth: data.sinPaymentMethod,
+                // U_B_dni_type: data.documentTypeIdentity,
+                // U_B_compl: data.complement || '',
+                // U_TOKENSFE: data.transactionId,
 
-                U_B_State: "S",
+                U_B_State: "P",
                 U_B_valid: "V",
                 U_B_type: "N",    // Normal
                 U_B_invtype: "1", // Con derecho a crédito fiscal
-                U_B_doctype: "1",
+                // U_B_doctype: "1",
                 U_B_resp: "VALIDADA",
-                U_ORIGIN: "IZI",  
+                U_ORIGIN: "DMS_APP",  
 
-                U_B_cuf: data.cuf || null,
-                U_B_cufd: data.cufd || null,
+                // U_B_cuf: data.cuf || null,
+                // U_B_cufd: data.cufd || null,
 
                 DocumentLines: data.orderLines.map(line => ({
                     BaseType: 17,           // 17 = Orden de Venta (ORDR)
@@ -186,10 +186,10 @@ export class SapServiceLayerService {
             nit: data.nit,
             email: data.email,
             sinPaymentMethod: data.sinPaymentMethod,
-            documentTypeIdentity: data.documentTypeIdentity,
-            complement: data.complement,
-            cuf: data.cuf,
-            cufd: data.cufd,
+            // documentTypeIdentity: data.documentTypeIdentity,
+            // complement: data.complement,
+            // cuf: data.cuf,
+            // cufd: data.cufd,
 
             parentCardCode: data.parentCardCode,
             docDate: data.paymentDate,

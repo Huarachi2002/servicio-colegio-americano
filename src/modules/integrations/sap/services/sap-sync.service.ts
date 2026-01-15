@@ -5,15 +5,13 @@ import * as bcrypt from 'bcrypt';
 import { MobileUser } from 'src/database/entities/mobile-user.entity';
 import { Father } from 'src/database/entities/father.entity';
 import { SapService } from './sap.service';
-import { SapBusinessPartner, UserSyncResult, MassSyncResult, SyncJobState, SyncStatus } from './interfaces/sap.interface';
-import { SyncUsersFilterDto } from './dto/sync-user.dto';
+import { SapBusinessPartner, UserSyncResult, MassSyncResult, SyncJobState, SyncStatus } from '../interfaces/sap.interface';
+import { SyncUsersFilterDto } from '../dto/sync-user.dto';
 
 @Injectable()
 export class SapSyncService {
     private readonly logger = new Logger(SapSyncService.name);
     
-    // Almacenamiento en memoria de jobs de sincronización
-    // En producción, considerar usar Redis o base de datos
     private syncJobs = new Map<string, SyncJobState>();
 
     constructor(
