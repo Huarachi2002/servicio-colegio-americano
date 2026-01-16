@@ -35,13 +35,18 @@ export class ExternalApiService {
     ) { }
 
     /**
-     * Buscar deudores por documento (CI/NIT)
+     * Buscar deudores por method (ciOrNit | codAsociado)
      * Consulta OCRD (Socios de Negocio) y OCPR (Personas de Contacto) en SAP
      */
-    async findDebtorsByDocument(document: string): Promise<DebtorInfo[]> {
+    async findDebtorsByDocument(method: string, document: string): Promise<DebtorInfo[]> {
         try {
             this.logger.log(`Buscando deudores por documento: ${document}`);
-
+            let filter = '';
+            if (method === 'ciOrNit') {
+                filter = `(T0.LicTradNum = '${document}')`;
+            } else { // method === 'codAsociado'
+                filter = `(T0.CardCode = '${document}')`;
+            }
             const query = `
                 SELECT 
                     T0.CardCode,
@@ -51,7 +56,7 @@ export class ExternalApiService {
                     T1.Name as StudentName
                 FROM OCRD T0
                 INNER JOIN OCPR T1 ON T0.CardCode = T1.CardCode
-                WHERE (T0.LicTradNum = '${document}' OR T0.CardCode = '${document}')
+                WHERE ${filter}
                 AND T0.CardType = 'C'
             `;
 
@@ -230,8 +235,8 @@ export class ExternalApiService {
                     cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BG');
                     break;
                 case 'LUKA':
-                    this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${dto.sinPaymentMethod}`);
-                    if (dto.sinPaymentMethod === 1) { // QR
+                    this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${dto.paymentMethod}`);
+                    if (dto.paymentMethod === 1) { // QR
                         cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_QR');
                     } else { // Tarjeta Debito/Crédito
                         cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_TARJETA');
@@ -251,10 +256,8 @@ export class ExternalApiService {
 
                     const processData: ProcessPaymentDto = {
                         transactionId: dto.transactionId,
-                        razonSocial: dto.razonSocial,
-                        nit: dto.nit,
                         email: dto.email,
-                        sinPaymentMethod: dto.sinPaymentMethod,
+                        paymentMethod: dto.paymentMethod,
                         transferAccount: cuentaContableSap,
                         parentCardCode: dto.parentCardCode,
                         paymentDate: dto.paymentDate,
@@ -366,8 +369,8 @@ export class ExternalApiService {
                 cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BG');
                 break;
             case 'LUKA':
-                this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${dto.sinPaymentMethod}`);
-                if (dto.sinPaymentMethod === 1){ // QR
+                this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${dto.paymentMethod}`);
+                if (dto.paymentMethod === 1){ // QR
                     cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_QR');
                 }else{ // Tarjeta
                     cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_TARJETA');
@@ -411,10 +414,8 @@ export class ExternalApiService {
 
                 const processData: ProcessPaymentDto = {
                     transactionId: dto.transactionId,
-                    razonSocial: dto.razonSocial,
-                    nit: dto.nit,
                     email: dto.email,
-                    sinPaymentMethod: dto.sinPaymentMethod,
+                    paymentMethod: dto.paymentMethod,
                     transferAccount: cuentaContableSap,
                     parentCardCode: dto.parentCardCode,
                     paymentDate: dto.paymentDate,

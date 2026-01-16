@@ -3,7 +3,7 @@ export interface CreateInvoiceDto {
     razonSocial: string;
     nit: string;
     email: string;
-    sinPaymentMethod: number;
+    paymentMethod: number;
     parentCardCode: string;
     docDate: string;
     bankName: string;
@@ -42,10 +42,8 @@ export interface PaymentProcessResult {
 
 export interface ProcessPaymentDto {
     transactionId: string;
-    razonSocial: string;
-    nit: string;
     email: string;
-    sinPaymentMethod: number;
+    paymentMethod: number;
     transferAccount: string;
     parentCardCode: string;
     paymentDate: string;

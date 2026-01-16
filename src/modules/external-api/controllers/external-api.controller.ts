@@ -32,10 +32,11 @@ export class ExternalApiController {
 
     /**
      * Buscar deudores por CI/NIT del padre (socio de negocio)
-     * GET /api/external/debtors?document=12345678
+     * GET /api/external/debtors?method=ciOrNit&document=12345678
      */
     @Get('debtors')
     async findDebtorsByDocument(
+        @Query('method') method: string,
         @Query('document') document: string,
         @CurrentApiClient() client: ApiClient,
     ): Promise<ExternalApiResponse<any>> {
@@ -47,7 +48,7 @@ export class ExternalApiController {
                 return this.createResponse(requestId, false, 'INVALID_DATA', 'Documento requerido', null);
             }
 
-            const debtors = await this.externalApiService.findDebtorsByDocument(document);
+            const debtors = await this.externalApiService.findDebtorsByDocument(method, document);
 
             if (debtors.length === 0) {
                 return this.createResponse(requestId, true, 'NOT_FOUND', 'No se encontraron deudores', []);
@@ -129,7 +130,7 @@ export class ExternalApiController {
         const requestId = this.externalApiService.generateRequestId();
         const studentCount = dto.students?.length || 0;
         const studentCodes = dto.students?.map(s => s.studentCode).join(', ') || 'N/A';
-        
+
         this.logger.log(`[${requestId}] ${client.name} - Notificación de pago recibida: ${dto.transactionId} | Padre: ${dto.parentCardCode} | Estudiantes: ${studentCount} (${studentCodes})`);
 
         try {
@@ -146,7 +147,7 @@ export class ExternalApiController {
 
             // Validar idempotencia de forma sincrónica
             const existingNotification = await this.externalApiService.checkExistingNotification(dto.transactionId);
-            
+
             if (existingNotification) {
                 this.logger.log(`[${requestId}] Pago ya procesado: ${dto.transactionId}`);
                 return this.createResponse(
@@ -170,7 +171,7 @@ export class ExternalApiController {
             return this.createResponse(
                 requestId,
                 true,
-                'ACCEPTED',
+                'OK',
                 'Notificación recibida.',
                 {
                     internalId: initialNotification.id,
@@ -179,8 +180,6 @@ export class ExternalApiController {
                     studentCount: studentCount,
                     studentCodes: studentCodes,
                     totalAmount: dto.amount,
-                    status: 'RECEIVED',
-                    message: 'En proceso con SAP',
                 },
             );
         } catch (error) {
@@ -281,7 +280,7 @@ export class ExternalApiController {
             };
         } catch (error) {
             this.logger.error(`[${requestId}] BNB test failed: ${error.message}`);
-            
+
             return {
                 success: false,
                 message: 'Error conectando con BNB',

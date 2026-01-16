@@ -28,20 +28,12 @@ export class PaymentNotificationDto {
     @IsString()
     receiptNumber?: string;  // Número de recibo del banco
 
-    @IsString()
-    @IsOptional()
-    razonSocial?: string;  // Razón social para facturación
-
-    @IsString()
-    @IsOptional()
-    nit?: string;  // NIT para facturación
-    
     @IsOptional()
     @IsString()
     email?: string;  // Email para envío de factura
     
     @IsNumber()
-    sinPaymentMethod: number;  // Método de pago SIN (1=QR, 2=Tarjeta, etc.)
+    paymentMethod: number;  // Método de pago SIN (1=QR, 2=Tarjeta, etc.)
     
     @IsArray()
     @ArrayMinSize(1)
@@ -57,10 +49,6 @@ export class StudentPaymentDetail {
     @IsString()
     @IsNotEmpty()
     studentCode: string;  // CntctCode del estudiante
-
-    @IsOptional()
-    @IsString()
-    studentName?: string;  // Nombre del estudiante (opcional, para logs)
 
     @IsArray()
     @ArrayMinSize(1)
