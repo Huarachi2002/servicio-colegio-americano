@@ -1,7 +1,5 @@
 export interface CreateInvoiceDto {
     transactionId: string;
-    razonSocial: string;
-    nit: string;
     email: string;
     paymentMethod: number;
     parentCardCode: string;

@@ -70,8 +70,8 @@ export class SapServiceLayerService {
                 Comments: `Pago desde App/Web. Ref: ${data.transactionId}`,
 
                 U_TIPODOC: 7,
-                U_RAZSOC: data.razonSocial,
-                U_NIT: data.nit,
+                // U_RAZSOC: data.razonSocial,
+                // U_NIT: data.nit,
                 // U_EMAIL: data.email,
                 // U_B_paymeth: data.paymentMethod,
                 // U_B_dni_type: data.documentTypeIdentity,
@@ -182,8 +182,8 @@ export class SapServiceLayerService {
         // Paso 1: Crear Factura
         const invoice = await this.createInvoiceFromOrder({
             transactionId: data.transactionId,
-            razonSocial: data.razonSocial,
-            nit: data.nit,
+            // razonSocial: data.razonSocial,
+            // nit: data.nit,
             email: data.email,
             paymentMethod: data.paymentMethod,
             // documentTypeIdentity: data.documentTypeIdentity,
