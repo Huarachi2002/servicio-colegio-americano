@@ -133,13 +133,10 @@ export class SchoolService {
      * Replica: SchoolApiService::getAnnotationsAndAbsences()
      */
     async getAnnotationsAndAbsences(studentErpCode: string): Promise<any> {
-        // Aquí deberías llamar al stored procedure correspondiente en SAP
-        // Por ahora retornamos estructura vacía
         this.logger.log(
             `Getting annotations for student: ${studentErpCode}`,
         );
 
-        // TODO: Implementar llamada a SP de SAP para anotaciones
         return {
             annotations: [],
             absences: [],
@@ -152,9 +149,6 @@ export class SchoolService {
      */
     async getDebtState(studentErpCode: string): Promise<string | null> {
         try {
-            // Llamar directamente a SAP con query
-            // En Laravel usa DB::connection('tempdb')->select(...)
-            // Aquí usamos SapService que ya tiene conexión configurada
             this.logger.log(`Getting debt state for: ${studentErpCode}`);
             return await this.sapService.getDebtsState(studentErpCode);
         } catch (error) {
