@@ -3,8 +3,8 @@ import { UserSeeder } from './user.seeder';
 import { RolSeeder } from './rol.seeder';
 
 const seeders = [
-    UserSeeder,
     RolSeeder,
+    UserSeeder,
 ];
 
 /**
