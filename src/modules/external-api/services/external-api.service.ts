@@ -6,7 +6,7 @@ import { PaymentNotification } from '../../../database/entities/payment-notifica
 import { SapService } from '../../integrations/sap/services/sap.service';
 import { SapDebtService } from '../../integrations/sap/services/sap-debt.service';
 import { SapServiceLayerService } from '../../integrations/sap/services/sap-service-layer.service';
-import { PaymentNotificationDto } from '../dto/payment-notification.dto';
+import { PaymentNotificationDto, consolidateOrderLines, getStudentCodesString } from '../dto/payment-notification.dto';
 import {
     DebtorInfo,
     PaymentConfirmation,
@@ -157,6 +157,7 @@ export class ExternalApiService {
 
     /**
      * Crear registro inicial de notificación (sincrónico)
+     * Soporta múltiples estudiantes en un solo pago
      */
     async createInitialNotification(
         dto: PaymentNotificationDto,
@@ -167,10 +168,16 @@ export class ExternalApiService {
             throw new Error(`Cliente API con ID ${apiClientId} no encontrado`);
         }
 
+        // Consolidar información de múltiples estudiantes
+        const studentCodes = getStudentCodesString(dto.students);
+        const studentCount = dto.students.length;
+
         const notification = this.paymentNotificationRepo.create({
             externalTransactionId: dto.transactionId,
-            studentCode: dto.studentCode,
-            parentCardCode: '', // Se llenará en el procesamiento async
+            studentCodes: studentCodes,
+            studentCount: studentCount,
+            parentCardCode: dto.parentCardCode,
+            studentsDetail: JSON.stringify(dto.students),
             amount: dto.amount,
             currency: dto.currency,
             apiClientId: apiClient.id,
@@ -187,6 +194,7 @@ export class ExternalApiService {
     /**
      * Procesar notificación de pago de forma asincrónica
      * Este método NO bloquea la respuesta HTTP
+     * Soporta múltiples estudiantes: consolida orderLines de todos
      */
     async processPaymentNotificationAsync(
         dto: PaymentNotificationDto,
@@ -194,10 +202,8 @@ export class ExternalApiService {
         requestId: string,
     ): Promise<void> {
         try {
-            this.logger.log(`[${requestId}] Iniciando procesamiento async de pago: ${dto.transactionId}`);
-
-            // Obtener información del estudiante
-            const debtInfo = await this.getPriorityDebt(dto.studentCode);
+            const studentCount = dto.students?.length || 0;
+            this.logger.log(`[${requestId}] Iniciando procesamiento async de pago: ${dto.transactionId} (${studentCount} estudiantes)`);
 
             // Obtener notificación creada
             const notification = await this.paymentNotificationRepo.findOne({
@@ -205,12 +211,7 @@ export class ExternalApiService {
             });
 
             if (!notification) {
-                throw new Error('Notificación no encontrada');
-            }
-
-            // Actualizar CardCode del padre
-            if (debtInfo?.parentCode) {
-                notification.parentCardCode = debtInfo.parentCode;
+                throw new Error(`Notificación ${dto.transactionId} no encontrada`);
             }
 
             // Obtener configuracion del Cliente API
@@ -238,17 +239,15 @@ export class ExternalApiService {
                     break;
             }
 
-            // Si SAP Service Layer está configurado, procesar
-            if (this.sapServiceLayerService.isConfigured() && dto.orderLines?.length) {
+            // Consolidar orderLines de todos los estudiantes
+            const consolidatedOrderLines = consolidateOrderLines(dto.students);
+            this.logger.log(`[${requestId}] Total de líneas consolidadas: ${consolidatedOrderLines.length} de ${studentCount} estudiantes`);
+
+            // Si SAP Service Layer está configurado y hay líneas, procesar
+            if (this.sapServiceLayerService.isConfigured() && consolidatedOrderLines.length > 0) {
                 try {
                     notification.status = 'PROCESSING';
                     await this.paymentNotificationRepo.save(notification);
-
-                    const parentCardCode = debtInfo?.parentCode || '';
-
-                    if (!parentCardCode) {
-                        throw new Error('No se pudo obtener el CardCode del padre');
-                    }
 
                     const processData: ProcessPaymentDto = {
                         transactionId: dto.transactionId,
@@ -257,12 +256,12 @@ export class ExternalApiService {
                         email: dto.email,
                         sinPaymentMethod: dto.sinPaymentMethod,
                         transferAccount: cuentaContableSap,
-                        parentCardCode,
+                        parentCardCode: dto.parentCardCode,
                         paymentDate: dto.paymentDate,
                         amount: dto.amount,
                         bankName: 'Servicio Externo',
                         externalReference: dto.transactionId,
-                        orderLines: dto.orderLines.map(line => ({
+                        orderLines: consolidatedOrderLines.map(line => ({
                             orderDocEntry: line.orderDocEntry,
                             lineNum: line.lineNum,
                         })),
@@ -279,7 +278,7 @@ export class ExternalApiService {
                         notification.sapPaymentDocNum = result.paymentDocNum;
                         notification.processedAt = new Date();
 
-                        this.logger.log(`[${requestId}] Pago procesado exitosamente en SAP`);
+                        this.logger.log(`[${requestId}] Pago procesado exitosamente en SAP (${studentCount} estudiantes, ${consolidatedOrderLines.length} líneas)`);
                     } else {
                         notification.status = 'FAILED';
                         notification.sapSyncStatus = 'ERROR';
@@ -322,14 +321,16 @@ export class ExternalApiService {
 
     /**
      * Procesar notificación de pago desde servicio externo (DEPRECATED - usar processPaymentNotificationAsync)
-     * Mantenuido para compatibilidad hacia atrás
+     * Mantenido para compatibilidad hacia atrás
+     * Ahora soporta múltiples estudiantes
      */
     async processPaymentNotification(
         dto: PaymentNotificationDto,
         apiClientId: number,
     ): Promise<PaymentConfirmation> {
         const requestId = uuidv4();
-        this.logger.log(`[${requestId}] Procesando notificación de pago: ${dto.transactionId}`);
+        const studentCount = dto.students?.length || 0;
+        this.logger.log(`[${requestId}] Procesando notificación de pago: ${dto.transactionId} (${studentCount} estudiantes)`);
 
         // Verificar idempotencia
         const existing = await this.paymentNotificationRepo.findOne({
@@ -374,14 +375,17 @@ export class ExternalApiService {
                 break;
         }
 
-        // Obtener información del estudiante para conseguir CardCode del padre
-        const debtInfo = await this.getPriorityDebt(dto.studentCode);
+        // Consolidar información de estudiantes
+        const studentCodes = getStudentCodesString(dto.students);
+        const consolidatedOrderLines = consolidateOrderLines(dto.students);
 
         // Crear registro de notificación
         const notification = this.paymentNotificationRepo.create({
             externalTransactionId: dto.transactionId,
-            studentCode: dto.studentCode,
-            parentCardCode: debtInfo?.parentCode || '', // Se necesita obtener
+            studentCodes: studentCodes,
+            studentCount: studentCount,
+            parentCardCode: dto.parentCardCode,
+            studentsDetail: JSON.stringify(dto.students),
             amount: dto.amount,
             currency: dto.currency,
             apiClientId: apiClient.id,
@@ -396,15 +400,13 @@ export class ExternalApiService {
         this.logger.log(`[${requestId}] Notificación guardada con ID: ${notification.id}`);
 
         // Si SAP Service Layer está configurado, procesar
-        if (this.sapServiceLayerService.isConfigured() && dto.orderLines?.length) {
+        if (this.sapServiceLayerService.isConfigured() && consolidatedOrderLines.length > 0) {
             try {
                 notification.status = 'PROCESSING';
                 await this.paymentNotificationRepo.save(notification);
 
-                const parentCardCode = debtInfo?.parentCode || '';
-
-                if (!parentCardCode) {
-                    throw new Error('No se pudo obtener el CardCode del padre');
+                if (!dto.parentCardCode) {
+                    throw new Error('No se proporcionó el CardCode del padre');
                 }
 
                 const processData: ProcessPaymentDto = {
@@ -414,12 +416,12 @@ export class ExternalApiService {
                     email: dto.email,
                     sinPaymentMethod: dto.sinPaymentMethod,
                     transferAccount: cuentaContableSap,
-                    parentCardCode,
+                    parentCardCode: dto.parentCardCode,
                     paymentDate: dto.paymentDate,
                     amount: dto.amount,
-                    bankName: 'Servicio Externo', // Se puede obtener del ApiClient
+                    bankName: 'Servicio Externo',
                     externalReference: dto.transactionId,
-                    orderLines: dto.orderLines.map(line => ({
+                    orderLines: consolidatedOrderLines.map(line => ({
                         orderDocEntry: line.orderDocEntry,
                         lineNum: line.lineNum,
                     })),

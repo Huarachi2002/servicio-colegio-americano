@@ -12,6 +12,7 @@ import { ApiClient } from './api-client.entity';
 /**
  * Entidad para registrar notificaciones de pago de servicios externos
  * Almacena el estado de procesamiento y sincronización con SAP
+ * Soporta pagos de múltiples cuotas de múltiples hijos de un mismo padre
  */
 @Entity('payment_notifications')
 export class PaymentNotification {
@@ -21,11 +22,17 @@ export class PaymentNotification {
     @Column({ name: 'external_transaction_id', unique: true, length: 100 })
     externalTransactionId: string;  // ID único del banco (para idempotencia)
 
-    @Column({ name: 'student_code', length: 50 })
-    studentCode: string;  // CntctCode del estudiante
+    @Column({ name: 'student_codes', length: 500 })
+    studentCodes: string;  // CntctCodes de estudiantes separados por coma (ej: "123,456,789")
 
-    @Column({ name: 'parent_card_code', length: 50, nullable: true })
+    @Column({ name: 'student_count', default: 1 })
+    studentCount: number;  // Cantidad de estudiantes en el pago
+
+    @Column({ name: 'parent_card_code', length: 50 })
     parentCardCode: string;  // CardCode del padre (socio de negocio)
+
+    @Column({ name: 'students_detail', type: 'text', nullable: true })
+    studentsDetail: string;  // JSON con detalle de estudiantes y líneas pagadas
 
     @Column({ name: 'debt_reference', length: 100, nullable: true })
     debtReference: string;  // idTransaccion de SAP (DocEntry de ORDR)

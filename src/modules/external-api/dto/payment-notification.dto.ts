@@ -1,8 +1,9 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, IsDateString, IsIn, Min, ValidateNested, IsArray } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, IsDateString, ValidateNested, IsArray, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
  * DTO para notificación de pago desde servicio externo (banco)
+ * Soporta pagos de múltiples cuotas de múltiples hijos de un mismo padre
  */
 export class PaymentNotificationDto {
     @IsString()
@@ -11,13 +12,14 @@ export class PaymentNotificationDto {
 
     @IsString()
     @IsNotEmpty()
-    studentCode: string;  // CntctCode del estudiante
+    parentCardCode: string;  // CardCode del padre (socio de negocio)
 
     @IsNumber()
-    amount: number;  // Monto pagado
+    amount: number;  // Monto total pagado
 
     @IsString()
-    currency: string;
+    @IsNotEmpty()
+    currency: string;  // BOB o USD
 
     @IsDateString()
     paymentDate: string;  // Fecha del pago (YYYY-MM-DD)
@@ -28,24 +30,43 @@ export class PaymentNotificationDto {
 
     @IsString()
     @IsOptional()
-    razonSocial?: string;  
+    razonSocial?: string;  // Razón social para facturación
 
     @IsString()
     @IsOptional()
-    nit?: string;
+    nit?: string;  // NIT para facturación
     
     @IsOptional()
     @IsString()
-    email?: string;       
+    email?: string;  // Email para envío de factura
     
     @IsNumber()
-    sinPaymentMethod: number; 
+    sinPaymentMethod: number;  // Método de pago SIN (1=QR, 2=Tarjeta, etc.)
     
-    @IsOptional()
     @IsArray()
+    @ArrayMinSize(1)
+    @ValidateNested({ each: true })
+    @Type(() => StudentPaymentDetail)
+    students: StudentPaymentDetail[];  // Estudiantes con sus líneas a pagar
+}
+
+/**
+ * Detalle de pago por estudiante
+ */
+export class StudentPaymentDetail {
+    @IsString()
+    @IsNotEmpty()
+    studentCode: string;  // CntctCode del estudiante
+
+    @IsOptional()
+    @IsString()
+    studentName?: string;  // Nombre del estudiante (opcional, para logs)
+
+    @IsArray()
+    @ArrayMinSize(1)
     @ValidateNested({ each: true })
     @Type(() => OrderLineDto)
-    orderLines?: OrderLineDto[];  // Líneas de orden a facturar
+    orderLines: OrderLineDto[];  // Líneas de orden a facturar
 }
 
 /**
@@ -57,6 +78,20 @@ export class OrderLineDto {
 
     @IsNumber()
     lineNum: number;  // LineNum en RDR1
+}
+
+/**
+ * Helper para consolidar orderLines de múltiples estudiantes
+ */
+export function consolidateOrderLines(students: StudentPaymentDetail[]): OrderLineDto[] {
+    return students.flatMap(student => student.orderLines);
+}
+
+/**
+ * Helper para obtener códigos de estudiantes como string separado por comas
+ */
+export function getStudentCodesString(students: StudentPaymentDetail[]): string {
+    return students.map(s => s.studentCode).join(',');
 }
 
 /**

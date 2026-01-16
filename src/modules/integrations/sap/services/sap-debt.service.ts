@@ -181,6 +181,8 @@ export class SapDebtService {
             idProceso: String(xmlData.idProceso || 'False'),
             MensajeProceso: String(xmlData.MensajeProceso || ''),
             NombreDeudor: String(xmlData.NombreDeudor || ''),
+            RazonSocial: String(xmlData.RazonSocial || ''),
+            Nit: String(xmlData.Nit || ''),
             MonedaDeuda: xmlData.MonedaDeuda || 'BOB',
             MontoDeuda: String(xmlData.MontoDeuda || '0'),
             DetalleDeuda: detalleDeuda,

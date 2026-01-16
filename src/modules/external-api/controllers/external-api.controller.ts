@@ -116,6 +116,7 @@ export class ExternalApiController {
      * Webhook: Notificación de pago realizado (Asincrónico)
      * POST /api/external/payments/notify
      * 
+     * Soporta pagos de múltiples cuotas de múltiples hijos de un mismo padre.
      * Retorna inmediatamente con estado ACCEPTED.
      * El procesamiento en SAP se realiza en background.
      * El estado se actualiza en la BD según avance del procesamiento.
@@ -126,9 +127,23 @@ export class ExternalApiController {
         @CurrentApiClient() client: ApiClient,
     ): Promise<ExternalApiResponse<any>> {
         const requestId = this.externalApiService.generateRequestId();
-        this.logger.log(`[${requestId}] ${client.name} - Notificación de pago recibida: ${dto.transactionId}`);
+        const studentCount = dto.students?.length || 0;
+        const studentCodes = dto.students?.map(s => s.studentCode).join(', ') || 'N/A';
+        
+        this.logger.log(`[${requestId}] ${client.name} - Notificación de pago recibida: ${dto.transactionId} | Padre: ${dto.parentCardCode} | Estudiantes: ${studentCount} (${studentCodes})`);
 
         try {
+            // Validar que hay estudiantes
+            if (!dto.students || dto.students.length === 0) {
+                return this.createResponse(
+                    requestId,
+                    false,
+                    'INVALID_DATA',
+                    'Debe incluir al menos un estudiante con líneas de pago',
+                    null,
+                );
+            }
+
             // Validar idempotencia de forma sincrónica
             const existingNotification = await this.externalApiService.checkExistingNotification(dto.transactionId);
             
@@ -160,6 +175,10 @@ export class ExternalApiController {
                 {
                     internalId: initialNotification.id,
                     transactionId: dto.transactionId,
+                    parentCardCode: dto.parentCardCode,
+                    studentCount: studentCount,
+                    studentCodes: studentCodes,
+                    totalAmount: dto.amount,
                     status: 'RECEIVED',
                     message: 'En proceso con SAP',
                 },
