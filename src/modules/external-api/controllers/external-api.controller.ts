@@ -32,7 +32,7 @@ export class ExternalApiController {
 
     /**
      * Buscar deudores por CI/NIT del padre (socio de negocio)
-     * GET /api/external/debtors?method=ciOrNit&document=12345678
+     * GET /api/external/debtors?method=codAsociado&document=12345678
      */
     @Get('debtors')
     async findDebtorsByDocument(
@@ -44,7 +44,7 @@ export class ExternalApiController {
         this.logger.log(`[${requestId}] ${client.name} - Buscando deudores por documento: ${document}`);
 
         try {
-            if (!document || document.trim().length === 0) {
+            if (!document || document.length === 0) {
                 return this.createResponse(requestId, false, 'INVALID_DATA', 'Documento requerido', null);
             }
 
