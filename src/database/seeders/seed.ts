@@ -16,7 +16,12 @@ async function main() {
         password: process.env.DB_PASSWORD || '',
         database: process.env.DB_DATABASE || 'dms_sccs',
         entities: [join(__dirname, '../entities/*.entity.{ts,js}')],
-        synchronize: false, 
+        synchronize: false,
+        options: {
+            encrypt: process.env.DB_ENCRYPT === 'true',
+            trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === 'true',
+            enableArithAbort: true,
+        },
     });
 
     try {
