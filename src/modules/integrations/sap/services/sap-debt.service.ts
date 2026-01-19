@@ -8,6 +8,15 @@ import {
     PendingDebtDetail,
     ConsultaDeudaXmlData,
     ConsultaDeudaPendienteXmlData,
+    FamilyPlanResponse,
+    ConsultaDeudaFamiliarXmlData,
+    StudentDebtInfo,
+    OrdenInfo,
+    CuotaItem,
+    EstudianteXmlData,
+    OrdenXmlData,
+    CuotaXmlData,
+    StudentsDebtDetails,
 } from '../interfaces/debt-consultation.interface';
 
 @Injectable()
@@ -69,6 +78,31 @@ export class SapDebtService {
         }
     }
 
+    async getPendingFamilyDebts(
+        parentCode: string,
+    ): Promise<FamilyPlanResponse | null> {
+        try {
+            this.logger.log(`Consultando deuda pendiente para padre: ${parentCode} de sus hijos`);
+
+            // Ejecutar stored procedure SP_B_ConsultaDeudaFamiliar
+            const result = await this.sapService.executeStoredProcedure<ConsultaDeudaFamiliarXmlData>(
+                'SP_B_ConsultaDeudaFamiliar',
+                parentCode,
+            );
+
+            if (!result) {
+                this.logger.warn(`No hay deuda pendiente para ${parentCode}`);
+                return null;
+            }
+
+            // Transformar respuesta XML a interface tipada
+            return this.transformFamilyDebtResponse(result);
+        } catch (error) {
+            this.logger.error(`Error obteniendo deuda pendiente: ${error.message}`);
+            return null;
+        }
+    }
+
     private transformDebtResponse(xmlData: ConsultaDeudaXmlData): DebtConsultationResponse {
         return {
             idProceso: String(xmlData.idProceso || 'False'),
@@ -98,6 +132,96 @@ export class SapDebtService {
         };
     }
 
+    private transformFamilyDebtResponse(
+        xmlData: ConsultaDeudaFamiliarXmlData,
+    ): FamilyPlanResponse {
+        // Normalizar Estudiantes: puede venir como objeto o array
+        const estudiantesRaw = xmlData.Estudiantes?.Estudiante;
+        const estudiantesArray: EstudianteXmlData[] = Array.isArray(estudiantesRaw)
+            ? estudiantesRaw
+            : estudiantesRaw
+                ? [estudiantesRaw]
+                : [];
+
+        // Calcular monto total sumando todos los estudiantes
+        let montoTotalFamiliar = 0;
+
+        // Transformar cada estudiante
+        const estudiantes: StudentDebtInfo[] = estudiantesArray.map((estudiante) => {
+            // Normalizar ListaOrdenes: puede venir como objeto o array
+            const ordenesRaw = estudiante.ListaOrdenes?.Orden;
+            const ordenesArray: OrdenXmlData[] = Array.isArray(ordenesRaw)
+                ? ordenesRaw
+                : ordenesRaw
+                    ? [ordenesRaw]
+                    : [];
+
+            // Transformar cada orden
+            const ordenes: OrdenInfo[] = ordenesArray.map((orden) => {
+                // Normalizar DetalleCuotas: puede venir como objeto o array
+                const cuotasRaw = orden.DetalleCuotas?.Cuota;
+                const cuotasArray: CuotaXmlData[] = Array.isArray(cuotasRaw)
+                    ? cuotasRaw
+                    : cuotasRaw
+                        ? [cuotasRaw]
+                        : [];
+
+                // Transformar cada cuota
+                const cuotas: CuotaItem[] = cuotasArray.map((cuota) => {
+                    const periodoStr = String(cuota.PeriodoDeuda || '');
+                    const fechaVencimiento = this.calcularFechaVencimiento(periodoStr);
+
+                    return {
+                        lineNum: Number(cuota.LineNum) || 0,
+                        concepto: String(cuota.ConceptoDeuda || ''),
+                        periodo: periodoStr,
+                        fechaVencimiento,
+                        multa: Number(cuota.MultaDeuda) || 0,
+                        descuento: Number(cuota.DescuentoDeuda) || 0,
+                        monto: Number(cuota.MontoDeuda) || 0,
+                    };
+                });
+
+                return {
+                    idTransaccion: Number(orden.IdTransaccion) || 0,
+                    cuotas,
+                };
+            });
+
+            const montoEstudiante = Number(estudiante.MontoTotalEstudiante) || 0;
+            montoTotalFamiliar += montoEstudiante;
+
+            return {
+                codigoEstudiante: String(estudiante.CodigoEstudiante || ''),
+                nombreEstudiante: String(estudiante.NombreEstudiante || ''),
+                montoTotal: montoEstudiante,
+                ordenes,
+            };
+        });
+
+        return {
+            nombrePadre: String(xmlData.NombrePadre || ''),
+            razonSocial: String(xmlData.RazonSocial || ''),
+            nit: String(xmlData.Nit || ''),
+            moneda: String(xmlData.MonedaGlobal || 'BOB'),
+            montoTotal: montoTotalFamiliar,
+            estudiantes,
+        };
+    }
+
+    /** Helper para calcular fecha de vencimiento desde periodo "M - AAAA" */
+    private calcularFechaVencimiento(periodoStr: string): string {
+        if (!periodoStr || !periodoStr.includes(' - ')) {
+            return '';
+        }
+
+        const periodoMes = periodoStr.substring(0, periodoStr.indexOf(' '));
+        const periodoAnio = periodoStr.substring(periodoStr.indexOf('-') + 2);
+        const mes = periodoMes.padStart(2, '0'); // "1" -> "01"
+
+        return `${periodoAnio}-${mes}-15`;
+    }
+
     private transformPendingDebtResponse(
         xmlData: ConsultaDeudaPendienteXmlData,
     ): PendingDebtConsultationResponse {
@@ -113,17 +237,17 @@ export class SapDebtService {
         const detalleDeuda: PendingDebtDetail[] = detalleDeudaArray.map((detalle) => {
             // Convertir PeriodoDeuda a string antes de operar
             const periodoDeudaStr = String(detalle.PeriodoDeuda || '');
-            
+
             // detalle.PeriodoDeuda tiene formato "M - AAAA", extraer mes para posible uso futuro
             let periodoMes = '';
             let periodoAnio = '';
             let fechaVencimiento = '';
-            
+
             if (periodoDeudaStr && periodoDeudaStr.includes(' - ')) {
                 periodoMes = periodoDeudaStr.substring(0, periodoDeudaStr.indexOf(' '));
                 periodoAnio = periodoDeudaStr.substring(periodoDeudaStr.indexOf('-') + 2);
-                
-                switch(periodoMes) {
+
+                switch (periodoMes) {
                     case '1':
                         fechaVencimiento = `${periodoAnio}-01-15`;
                         break;

@@ -11,7 +11,7 @@ import {
     DebtorInfo,
     PaymentConfirmation,
 } from '../interfaces/external-api-response.interface';
-import { DebtConsultationResponse, PendingDebtConsultationResponse } from 'src/modules/integrations/sap/interfaces/debt-consultation.interface';
+import { DebtConsultationResponse, FamilyPlanResponse, PendingDebtConsultationResponse } from 'src/modules/integrations/sap/interfaces/debt-consultation.interface';
 import { ProcessPaymentDto } from 'src/modules/integrations/sap/interfaces/sap.interface';
 import { ApiClient } from 'src/database/entities/api-client.entity';
 import { ConfigService } from '@nestjs/config';
@@ -107,6 +107,22 @@ export class ExternalApiService {
             const debtData = await this.sapDebtService.getPendingDebtConsultation(studentCode);
 
             if (!debtData || debtData.idProceso === 'False') {
+                return null;
+            }
+            return debtData;
+        } catch (error) {
+            this.logger.error(`Error obteniendo deudas: ${error.message}`);
+            throw error;
+        }
+    }
+
+    async getFamilyDebts(parentCode: string): Promise<FamilyPlanResponse | null> {
+        try {
+            this.logger.log(`Obteniendo deudas para padre: ${parentCode}`);
+
+            const debtData = await this.sapDebtService.getPendingFamilyDebts(parentCode);
+
+            if (!debtData) {
                 return null;
             }
             return debtData;
@@ -370,9 +386,9 @@ export class ExternalApiService {
                 break;
             case 'LUKA':
                 this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${dto.paymentMethod}`);
-                if (dto.paymentMethod === 2){ // QR
+                if (dto.paymentMethod === 2) { // QR
                     cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_QR');
-                }else{ // Tarjeta debito/Crédito
+                } else { // Tarjeta debito/Crédito
                     cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_TARJETA');
                 }
                 break;

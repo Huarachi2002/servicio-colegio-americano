@@ -30,10 +30,6 @@ export class ExternalApiController {
         private readonly configService: ConfigService,
     ) { }
 
-    /**
-     * Buscar deudores por CI/NIT del padre (socio de negocio)
-     * GET /api/external/debtors?method=codAsociado&document=12345678
-     */
     @Get('debtors')
     async findDebtorsByDocument(
         @Query('method') method: string,
@@ -61,10 +57,6 @@ export class ExternalApiController {
         }
     }
 
-    /**
-     * Listar todas las deudas pendientes de un estudiante
-     * GET /api/external/students/:studentCode/debts
-     */
     @Get('students/:studentCode/debts')
     async getStudentDebts(
         @Param('studentCode') studentCode: string,
@@ -87,10 +79,29 @@ export class ExternalApiController {
         }
     }
 
-    /**
-     * Obtener detalle de la deuda prioritaria (más antigua)
-     * GET /api/external/students/:studentCode/debts/priority
-     */
+    @Get('family/:parentDocument/debts')
+    async getFamilyDebts(
+        @Param('parentDocument') parentDocument: string,
+        @CurrentApiClient() client: ApiClient,
+    ): Promise<ExternalApiResponse<any>> {
+        const requestId = this.externalApiService.generateRequestId();
+        this.logger.log(`[${requestId}] ${client.name} - Obteniendo deudas de familia: ${parentDocument}`);
+
+        try {
+            const debts = await this.externalApiService.getFamilyDebts(parentDocument);
+
+            if (!debts) {
+                return this.createResponse(requestId, true, 'NOT_FOUND', 'No hay deudas pendientes', []);
+            }
+
+            return this.createResponse(requestId, true, 'OK', 'Deudas encontradas', debts);
+        } catch (error) {
+            this.logger.error(`[${requestId}] Error: ${error.message}`);
+            return this.createResponse(requestId, false, 'ERROR', 'Error interno', null);
+        }
+    }
+
+
     @Get('students/:studentCode/debts/priority')
     async getPriorityDebt(
         @Param('studentCode') studentCode: string,
@@ -113,15 +124,6 @@ export class ExternalApiController {
         }
     }
 
-    /**
-     * Webhook: Notificación de pago realizado (Asincrónico)
-     * POST /api/external/payments/notify
-     * 
-     * Soporta pagos de múltiples cuotas de múltiples hijos de un mismo padre.
-     * Retorna inmediatamente con estado ACCEPTED.
-     * El procesamiento en SAP se realiza en background.
-     * El estado se actualiza en la BD según avance del procesamiento.
-     */
     @Post('payments/notify')
     async notifyPayment(
         @Body() dto: PaymentNotificationDto,

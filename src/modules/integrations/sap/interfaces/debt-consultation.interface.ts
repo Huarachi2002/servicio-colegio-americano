@@ -5,20 +5,6 @@
  * =====================================================
  */
 
-/**
- * Respuesta principal de SP_A_ConsultaDeudaLaravel
- * Estructura XML:
- * <ConsultaDeuda>
- *   <idProceso>True</idProceso>
- *   <MensajeProceso></MensajeProceso>
- *   <idTransaccion>1</idTransaccion>
- *   <NombreDeudor>NOMBRE COMPLETO</NombreDeudor>
- *   <MonedaDelCobro>U</MonedaDelCobro>
- *   <MontoDelCobro>3200.000000</MontoDelCobro>
- *   <DetalleDelCobro>...</DetalleDelCobro>
- *   <DatosFactura>...</DatosFactura>
- * </ConsultaDeuda>
- */
 export interface DebtConsultationResponse {
     idProceso: string; // 'True' o 'False'
     MensajeProceso: string; // Mensaje de error o vacío
@@ -32,18 +18,6 @@ export interface DebtConsultationResponse {
     DatosFactura: InvoiceData;
 }
 
-/**
- * Detalle del cobro para SP_A_ConsultaDeudaLaravel
- * Estructura XML:
- * <DetalleDelCobro>
- *   <ConceptoPago>Mensualidad - Primaria</ConceptoPago>
- *   <PeriodoPago>6 - 2026</PeriodoPago>
- *   <MultaPago>0</MultaPago>
- *   <DescuentoPago>0</DescuentoPago>
- *   <MontoPago>3200.000000</MontoPago>
- *   <Facturable>Y</Facturable>
- * </DetalleDelCobro>
- */
 export interface DebtDetail {
     ConceptoPago: string; // Ej: "Mensualidad - Primaria"
     PeriodoPago: string; // Ej: "6 - 2026" (mes - año)
@@ -53,18 +27,6 @@ export interface DebtDetail {
     Facturable: string; // 'Y' o 'N' (Si es facturable)
 }
 
-/**
- * Datos para facturación
- * Estructura XML:
- * <DatosFactura>
- *   <IdGeneraFact>S</IdGeneraFact>
- *   <NITCIFact>3146183015</NITCIFact>
- *   <NombreFact>ROSMERY SEJAS</NombreFact>
- *   <ModDatosFact>S</ModDatosFact>
- *   <DocumentType>5</DocumentType>
- *   <Complement></Complement>
- * </DatosFactura>
- */
 export interface InvoiceData {
     IdGeneraFact: string; // 'S' o 'N' (Si genera factura)
     NITCIFact: string; // NIT o CI para facturación
@@ -81,20 +43,6 @@ export interface InvoiceData {
  * =====================================================
  */
 
-/**
- * Respuesta principal de SP_B_ConsultaDeudaPendiente
- * Estructura XML:
- * <ConsultaDeudaPendiente>
- *   <idProceso>True</idProceso>
- *   <MensajeProceso></MensajeProceso>
- *   <NombreDeudor>NOMBRE COMPLETO</NombreDeudor>
- *   <MonedaDeuda>U</MonedaDeuda>
- *   <MontoDeuda>20000.000000</MontoDeuda>
- *   <DetalleDeuda>...</DetalleDeuda>
- *   <DetalleDeuda>...</DetalleDeuda>
- *   ...
- * </ConsultaDeudaPendiente>
- */
 export interface PendingDebtConsultationResponse {
     idProceso: string; // 'True' o 'False'
     MensajeProceso: string; // Mensaje de error o vacío
@@ -106,18 +54,6 @@ export interface PendingDebtConsultationResponse {
     DetalleDeuda: PendingDebtDetail[]; // Array de detalles de deuda
 }
 
-/**
- * Detalle de deuda individual para SP_B_ConsultaDeudaPendiente
- * Estructura XML:
- * <DetalleDeuda>
- *   <Facturable>Y</Facturable>
- *   <ConceptoDeuda>Mensualidad</ConceptoDeuda>
- *   <PeriodoDeuda>2 - 2026</PeriodoDeuda>
- *   <MultaDeuda>0</MultaDeuda>
- *   <DescuentoDeuda>0.000000</DescuentoDeuda>
- *   <MontoDeuda>2000.000000</MontoDeuda>
- * </DetalleDeuda>
- */
 export interface PendingDebtDetail {
     IdTransaccion: string; // DocEntry de SAP
     LinNum: string; // Número de línea en la deuda pendiente
@@ -184,3 +120,135 @@ export interface PendingDebtDetailXmlData {
     DescuentoDeuda?: string | number;
     MontoDeuda?: string | number;
 }
+
+/**
+ * =====================================================
+ * INTERFACES PARA SP_B_ConsultaDeudaFamiliar
+ * =====================================================
+ */
+
+export interface FamilyDebtResponse {
+    NombreDeudor: string; // Nombre del estudiante/deudor
+    RazonSocial?: string; // Nombre para facturación (opcional)
+    Nit?: string; // NIT o CI para facturación (opcional)
+    MonedaDeuda: string; // B=BOB
+    MontoDeuda: string; // Monto total de deuda familiar
+    StudentsDebts: StudentsDebtDetails[]; // Array de detalles de deuda
+}
+
+export interface StudentsDebtDetails {
+    NombreEstudiante?: string;
+    CodigoEstudiante?: string;
+    MontoTotalEstudiante?: string | number;
+    ListDebtDetails?: ListDebtDetail | ListDebtDetail[]; // Puede ser objeto o array
+}
+
+export interface ListDebtDetail {
+    IdTransaccion?: string | number;
+    LinNum?: string | number;
+    Facturable?: string;
+    ConceptoDeuda?: string;
+    PeriodoDeuda?: string;
+    MultaDeuda?: string | number;
+    DescuentoDeuda?: string | number;
+    MontoDeuda?: string | number;
+}
+
+/**
+ * =====================================================
+ * INTERFACES PARA SP_B_ConsultaDeudaFamiliar (Plan Familiar)
+ * Respuesta de consulta de deudas agrupadas por familia
+ * Estructura: PlanFamiliar → Estudiantes → Estudiante → ListaOrdenes → Orden → DetalleCuotas → Cuota
+ * =====================================================
+ */
+
+/** Datos crudos del XML de SP_B_ConsultaDeudaFamiliar */
+export interface ConsultaDeudaFamiliarXmlData {
+    NombrePadre?: string;
+    RazonSocial?: string;
+    Nit?: string;
+    MonedaGlobal?: string; // BOB o USD
+    Estudiantes?: EstudiantesXmlData;
+}
+
+/** Contenedor de estudiantes en el XML */
+export interface EstudiantesXmlData {
+    Estudiante?: EstudianteXmlData | EstudianteXmlData[]; // Puede ser objeto o array
+}
+
+/** Datos de cada estudiante en el XML */
+export interface EstudianteXmlData {
+    NombreEstudiante?: string;
+    CodigoEstudiante?: string | number;
+    MontoTotalEstudiante?: string | number;
+    ListaOrdenes?: ListaOrdenesXmlData;
+}
+
+/** Contenedor de órdenes en el XML */
+export interface ListaOrdenesXmlData {
+    Orden?: OrdenXmlData | OrdenXmlData[]; // Puede ser objeto o array
+}
+
+/** Datos de cada orden (agrupación por IdTransaccion) */
+export interface OrdenXmlData {
+    IdTransaccion?: string | number;  // DocEntry de ORDR
+    DetalleCuotas?: DetalleCuotasXmlData;
+}
+
+/** Contenedor de cuotas dentro de una orden */
+export interface DetalleCuotasXmlData {
+    Cuota?: CuotaXmlData | CuotaXmlData[]; // Puede ser objeto o array
+}
+
+/** Detalle de cada cuota en el XML */
+export interface CuotaXmlData {
+    LineNum?: string | number;        // LineNum en RDR1
+    Facturable?: string;              // 'Y' o 'N'
+    ConceptoDeuda?: string;           // Ej: "Cuota"
+    PeriodoDeuda?: string;            // Ej: "1 - 2026" (mes - año)
+    MultaDeuda?: string | number;     // Monto de multa
+    DescuentoDeuda?: string | number; // Monto de descuento
+    MontoDeuda?: string | number;     // Monto de la deuda
+}
+
+/**
+ * =====================================================
+ * INTERFACES PROCESADAS (Respuesta normalizada para API)
+ * =====================================================
+ */
+
+/** Respuesta procesada del Plan Familiar para la API */
+export interface FamilyPlanResponse {
+    nombrePadre: string;
+    razonSocial: string;
+    nit: string;
+    moneda: string;
+    montoTotal: number;
+    estudiantes: StudentDebtInfo[];
+}
+
+/** Información de deudas por estudiante */
+export interface StudentDebtInfo {
+    codigoEstudiante: string;
+    nombreEstudiante: string;
+    montoTotal: number;
+    ordenes: OrdenInfo[];  // Agrupación por IdTransaccion
+}
+
+/** Información de cada orden (agrupación por IdTransaccion) */
+export interface OrdenInfo {
+    idTransaccion: number;    // DocEntry de ORDR
+    cuotas: CuotaItem[];      // Cuotas dentro de esta orden
+}
+
+/** Ítem de cuota individual */
+export interface CuotaItem {
+    lineNum: number;          // LineNum en RDR1
+    concepto: string;         // ConceptoDeuda
+    periodo: string;          // PeriodoDeuda
+    fechaVencimiento: string;
+    multa: number;
+    descuento: number;
+    monto: number;
+}
+

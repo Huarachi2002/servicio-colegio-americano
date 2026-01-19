@@ -55,24 +55,24 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
     /**
      * Ejecutar stored procedure y obtener resultado XML
      */
-    async executeStoredProcedure<T = ConsultaDeudaXmlData>(
+    async executeStoredProcedure<T>(
         procedureName: string,
-        studentErpCode: string,
+        cardCode: string
     ): Promise<T> {
         try {
             this.logger.debug(
-                `Ejecutando ${procedureName} para estudiante: ${studentErpCode}`,
+                `Ejecutando ${procedureName} para estudiante: ${cardCode}`,
             );
 
             const request = this.pool.request();
-            request.input('CodigoEstudiante', sql.VarChar(50), studentErpCode);
+            request.input('CardCode', sql.VarChar(50), cardCode);
 
             // Ejecutar SP
             const result = await request.execute(procedureName);
 
             // El SP retorna XML en múltiples filas
             if (!result.recordset || result.recordset.length === 0) {
-                this.logger.warn(`No se obtuvieron datos para ${studentErpCode}`);
+                this.logger.warn(`No se obtuvieron datos para ${cardCode}`);
                 return null;
             }
 
@@ -88,16 +88,15 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
 
             // Parsear XML a objeto JavaScript
             const parsed = this.xmlParser.parse(xmlString);
-            
+
             // Log para debug: ver la estructura del XML parseado
             this.logger.debug(`Estructura parseada: ${JSON.stringify(Object.keys(parsed))}`);
 
-            // El XML tiene estructura: { ConsultaDeudaPendiente: { ...datos } }
             // Extraer el contenido del elemento raíz
             const rootKey = Object.keys(parsed)[0];
             const data = parsed[rootKey] || parsed;
-            
-            this.logger.debug(`Root key: ${rootKey}, tiene DetalleDeuda: ${!!data.DetalleDeuda}`);
+
+            this.logger.debug(`Root key: ${rootKey}`);
 
             return data;
         } catch (error) {
