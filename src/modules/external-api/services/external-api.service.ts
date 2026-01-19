@@ -183,6 +183,7 @@ export class ExternalApiService {
     async createInitialNotification(
         dto: PaymentNotificationDto,
         apiClientId: number,
+        totalAmount: number,
     ): Promise<PaymentNotification> {
         const apiClient = await this.apiClientRepo.findOne({ where: { id: apiClientId } });
         if (!apiClient) {
@@ -195,11 +196,11 @@ export class ExternalApiService {
 
         const notification = this.paymentNotificationRepo.create({
             externalTransactionId: dto.transactionId,
-            studentCodes: studentCodes,
-            studentCount: studentCount,
+            studentCodes,
+            studentCount,
             parentCardCode: dto.parentCardCode,
             studentsDetail: JSON.stringify(dto.students),
-            amount: dto.amount,
+            amount: totalAmount,
             currency: dto.currency,
             apiClientId: apiClient.id,
             status: 'RECEIVED',
@@ -221,6 +222,7 @@ export class ExternalApiService {
         dto: PaymentNotificationDto,
         apiClientId: number,
         requestId: string,
+        totalAmount: number,
     ): Promise<void> {
         try {
             const studentCount = dto.students?.length || 0;
@@ -277,7 +279,7 @@ export class ExternalApiService {
                         transferAccount: cuentaContableSap,
                         parentCardCode: dto.parentCardCode,
                         paymentDate: dto.paymentDate,
-                        amount: dto.amount,
+                        amount: totalAmount,
                         bankName: 'Servicio Externo',
                         externalReference: dto.transactionId,
                         orderLines: consolidatedOrderLines.map(line => ({
@@ -346,6 +348,7 @@ export class ExternalApiService {
     async processPaymentNotification(
         dto: PaymentNotificationDto,
         apiClientId: number,
+        amount: number,
     ): Promise<PaymentConfirmation> {
         const requestId = uuidv4();
         const studentCount = dto.students?.length || 0;
@@ -405,7 +408,7 @@ export class ExternalApiService {
             studentCount: studentCount,
             parentCardCode: dto.parentCardCode,
             studentsDetail: JSON.stringify(dto.students),
-            amount: dto.amount,
+            amount,
             currency: dto.currency,
             apiClientId: apiClient.id,
             status: 'RECEIVED',
@@ -435,7 +438,7 @@ export class ExternalApiService {
                     transferAccount: cuentaContableSap,
                     parentCardCode: dto.parentCardCode,
                     paymentDate: dto.paymentDate,
-                    amount: dto.amount,
+                    amount,
                     bankName: 'Servicio Externo',
                     externalReference: dto.transactionId,
                     orderLines: consolidatedOrderLines.map(line => ({

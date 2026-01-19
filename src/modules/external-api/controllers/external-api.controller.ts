@@ -161,11 +161,16 @@ export class ExternalApiController {
                 );
             }
 
+            let totalAmount = 0;
+            dto.students.forEach(student => {
+                totalAmount += student.orderLines.reduce((total, orderLine) => total + orderLine.amount, 0);
+            });
+
             // Crear registro inicial de la notificación (sincrónico)
-            const initialNotification = await this.externalApiService.createInitialNotification(dto, client.id);
+            const initialNotification = await this.externalApiService.createInitialNotification(dto, client.id, totalAmount);
 
             // Iniciar procesamiento en background (sin awaitar)
-            this.externalApiService.processPaymentNotificationAsync(dto, client.id, requestId).catch((error) => {
+            this.externalApiService.processPaymentNotificationAsync(dto, client.id, requestId, totalAmount).catch((error) => {
                 this.logger.error(`[${requestId}] Error en procesamiento async: ${error.message}`);
             });
 
@@ -179,9 +184,9 @@ export class ExternalApiController {
                     internalId: initialNotification.id,
                     transactionId: dto.transactionId,
                     parentCardCode: dto.parentCardCode,
-                    studentCount: studentCount,
-                    studentCodes: studentCodes,
-                    totalAmount: dto.amount,
+                    studentCount,
+                    studentCodes,
+                    totalAmount,
                 },
             );
         } catch (error) {

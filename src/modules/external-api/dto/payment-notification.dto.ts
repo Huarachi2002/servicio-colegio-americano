@@ -14,9 +14,6 @@ export class PaymentNotificationDto {
     @IsNotEmpty()
     parentCardCode: string;  // CardCode del padre (socio de negocio)
 
-    @IsNumber()
-    amount: number;  // Monto total pagado
-
     @IsString()
     @IsNotEmpty()
     currency: string;  // BOB o USD
@@ -31,10 +28,10 @@ export class PaymentNotificationDto {
     @IsOptional()
     @IsString()
     email?: string;  // Email para envío de factura
-    
+
     @IsNumber()
     paymentMethod: number;  // Método de pago SIN (1=QR, 2=Tarjeta, etc.)
-    
+
     @IsArray()
     @ArrayMinSize(1)
     @ValidateNested({ each: true })
@@ -66,6 +63,9 @@ export class OrderLineDto {
 
     @IsNumber()
     lineNum: number;  // LineNum en RDR1
+
+    @IsNumber()
+    amount: number;  // Amount en RDR1
 }
 
 /**
