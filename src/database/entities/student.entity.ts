@@ -23,8 +23,8 @@ export class Student {
     @Column()
     email: string;
 
-    @Column({ name: 'invoce_name', default: 'SIN NOMBRE' })
-    invoceName: string;
+    @Column({ name: 'invoice_name', default: 'SIN NOMBRE' })
+    invoiceName: string;
 
     @Column({ default: '0' })
     nit: string;

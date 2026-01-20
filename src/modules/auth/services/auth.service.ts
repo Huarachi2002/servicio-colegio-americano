@@ -70,6 +70,10 @@ export class AuthService {
         // Generar el token JWT
         const apiToken = this.generateToken(user);
 
+        // Calcular user_type basado en entity_type
+        // Father = 0, Employee = 1, Student = 3
+        const userType = this.getUserTypeFromEntityType(user.entity_type);
+
         this.logger.log("=======Fin sendLoginResponse========");
 
         // Respuesta estructurada para la app móvil
@@ -77,8 +81,28 @@ export class AuthService {
         return {
             id: user.id,
             name: user.name,
-            apiToken: apiToken,
+            api_token: apiToken,
+            entity_type: user.entity_type,
+            entity_id: user.entity_id,
+            user_type: userType.toString(),
         };
+    }
+
+    /**
+     * Calcula el user_type basado en entity_type
+     * Father = 0, Employee = 1, Father_Employee = 2, Student = 3
+     */
+    private getUserTypeFromEntityType(entityType: string): number {
+        switch (entityType) {
+            case 'Father':
+                return 0; // FATHER_TYPE
+            case 'Employee':
+                return 1; // EMPLOYEE_TYPE
+            case 'Student':
+                return 3; // STUDENT_TYPE
+            default:
+                return 0; // Por defecto Father (padres)
+        }
     }
 
     async loginWeb(loginDto: LoginDto): Promise<string> {

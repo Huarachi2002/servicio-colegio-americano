@@ -254,7 +254,7 @@ export class ExternalApiService {
                     break;
                 case 'LUKA':
                     this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${dto.paymentMethod}`);
-                    if (dto.paymentMethod === 1) { // QR
+                    if (dto.paymentMethod === 2) { // QR
                         cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_QR');
                     } else { // Tarjeta Debito/Crédito
                         cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_TARJETA');

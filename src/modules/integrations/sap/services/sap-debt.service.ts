@@ -110,7 +110,7 @@ export class SapDebtService {
             idTransaccion: String(xmlData.idTransaccion || '0',),
             parentCode: String(xmlData.parentCode || ''),
             NombreDeudor: String(xmlData.NombreDeudor || ''),
-            MonedaDelCobro: xmlData.MonedaDelCobro,
+            MonedaDelCobro: xmlData.MonedaDelCobro || 'BOB',  // Normalizado a BOB por defecto
             MontoDelCobro: String(xmlData.MontoDelCobro || '0'),
             TipoCambio: xmlData.TipoCambio ? String(xmlData.TipoCambio) : undefined,
             DetalleDelCobro: {
