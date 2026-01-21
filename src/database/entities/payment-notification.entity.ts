@@ -19,7 +19,7 @@ export class PaymentNotification {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column({ name: 'external_transaction_id', unique: true, length: 100, nullable: true })
+    @Column({ name: 'external_transaction_id', length: 100, nullable: true })
     externalTransactionId: string;  // ID único del banco (para idempotencia)
 
     @Column({ name: 'student_codes', length: 500 })
