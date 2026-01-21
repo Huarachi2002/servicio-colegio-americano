@@ -1,5 +1,6 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import * as dotenv from 'dotenv';
+import * as path from 'path';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -16,8 +17,13 @@ export const dataSourceOptions: DataSourceOptions = {
     username: process.env.DB_USERNAME || 'sa',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_DATABASE || 'dms_sccs',
-    entities: [__dirname + '/../database/entities/**/*.entity{.ts,.js}'],
-    migrations: [__dirname + '/../database/migrations/**/*{.ts,.js}'],
+    // Usar path.join con rutas absolutas desde la raíz del proyecto
+    entities: [
+        path.join(__dirname, '..', 'database', 'entities', '**', '*.entity{.ts,.js}')
+    ],
+    migrations: [
+        path.join(__dirname, '..', 'database', 'migrations', '**', '*{.ts,.js}')
+    ],
     synchronize: false, // Siempre false para usar migraciones
     logging: process.env.NODE_ENV === 'development',
     options: {
@@ -27,6 +33,18 @@ export const dataSourceOptions: DataSourceOptions = {
     },
 };
 
-// DataSource para CLI de TypeORM
+// DataSource para CLI de TypeORM - IMPORTANTE: debe estar inicializado
 const dataSource = new DataSource(dataSourceOptions);
+
+// Inicializar el DataSource automáticamente para CLI
+dataSource.initialize()
+    .then(() => {
+        if (process.env.NODE_ENV === 'development') {
+            console.log('DataSource inicializado correctamente');
+        }
+    })
+    .catch((error) => {
+        console.error('Error al inicializar DataSource:', error);
+    });
+
 export default dataSource;
