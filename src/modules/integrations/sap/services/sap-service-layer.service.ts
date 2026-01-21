@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
+import * as https from 'https';
 import { CreateInvoiceDto, CreatePaymentDto, PaymentProcessResult, ProcessPaymentDto, SapDocumentResponse } from '../interfaces/sap.interface';
 
 @Injectable()
@@ -10,9 +11,16 @@ export class SapServiceLayerService {
     private sessionId: string | null = null;
     private sessionExpiry: Date | null = null;
     private axiosInstance: AxiosInstance;
+    // Agente HTTPS que acepta certificados auto-firmados
+    private readonly httpsAgent: https.Agent;
 
     constructor(private readonly configService: ConfigService) {
         this.baseUrl = configService.get<string>('SAP_SERVICE_LAYER_URL') || '';
+
+        // Crear agente HTTPS que ignora validación de certificados (para certificados auto-firmados)
+        this.httpsAgent = new https.Agent({
+            rejectUnauthorized: false, // Acepta certificados auto-firmados
+        });
 
         // Crear instancia de axios con configuración base
         this.axiosInstance = axios.create({
@@ -21,6 +29,7 @@ export class SapServiceLayerService {
             headers: {
                 'Content-Type': 'application/json',
             },
+            httpsAgent: this.httpsAgent, // Usar agente HTTPS personalizado
         });
     }
 
@@ -29,7 +38,7 @@ export class SapServiceLayerService {
      */
     async login(): Promise<void> {
         try {
-            const response = await axios.post(`${this.baseUrl}/Login`, {
+            const response = await this.axiosInstance.post('/Login', {
                 CompanyDB: this.configService.get('SAP_COMPANY_DB'),
                 UserName: this.configService.get('SAP_SL_USER'),
                 Password: this.configService.get('SAP_SL_PASSWORD'),
@@ -62,45 +71,24 @@ export class SapServiceLayerService {
     async createInvoiceFromOrder(data: CreateInvoiceDto): Promise<SapDocumentResponse> {
         await this.ensureSession();
 
+        // Payload simplificado - probado exitosamente en Insomnia
         const invoicePayload = {
-                CardCode: data.parentCardCode,
-                DocDate: data.docDate,
-                DocDueDate: data.docDate,
-                NumAtCard: data.transactionId,
-                Comments: `Pago desde App/Web. Ref: ${data.transactionId}`,
-
-                U_TIPODOC: 7,
-                // U_RAZSOC: data.razonSocial,
-                // U_NIT: data.nit,
-                // U_EMAIL: data.email,
-                // U_B_paymeth: data.paymentMethod,
-                // U_B_dni_type: data.documentTypeIdentity,
-                // U_B_compl: data.complement || '',
-                // U_TOKENSFE: data.transactionId,
-
-                U_B_State: "P",
-                U_B_valid: "V",
-                U_B_type: "N",    // Normal
-                U_B_invtype: "1", // Con derecho a crédito fiscal
-                // U_B_doctype: "1",
-                U_B_resp: "VALIDADA",
-                U_ORIGIN: "DMS_APP",  
-
-                // U_B_cuf: data.cuf || null,
-                // U_B_cufd: data.cufd || null,
-
-                DocumentLines: data.orderLines.map(line => ({
-                    BaseType: 17,           // 17 = Orden de Venta (ORDR)
-                    BaseEntry: line.orderDocEntry,
-                    BaseLine: line.lineNum,
-                })),
-            };
+            CardCode: data.parentCardCode,
+            DocDate: data.docDate,
+            DocDueDate: data.docDate,
+            Comments: `Pago desde App/Web. Ref: ${data.transactionId}`,
+            DocumentLines: data.orderLines.map(line => ({
+                BaseType: 17,           // 17 = Orden de Venta (ORDR)
+                BaseEntry: line.orderDocEntry,
+                BaseLine: line.lineNum,
+            })),
+        };
 
         try {
             this.logger.log(`Creando factura para ${data.parentCardCode} con ${data.orderLines.length} líneas`);
 
-            const response = await axios.post(
-                `${this.baseUrl}/Invoices`,
+            const response = await this.axiosInstance.post(
+                '/Invoices',
                 invoicePayload,
                 { headers: this.getHeaders() }
             );
@@ -129,29 +117,27 @@ export class SapServiceLayerService {
     async createIncomingPayment(data: CreatePaymentDto): Promise<SapDocumentResponse> {
         await this.ensureSession();
 
+        // Payload simplificado - probado exitosamente en Insomnia
         const paymentPayload = {
             CardCode: data.parentCardCode,
             DocDate: data.paymentDate,
             DocType: "rCustomer",
-
             TransferAccount: data.transferAccount,
             TransferSum: data.amount,
             TransferDate: data.paymentDate,
-            TransferReference: data.externalReference,
-            
             PaymentInvoices: [{
                 LineNum: 0,
                 DocEntry: data.invoiceDocEntry,
                 SumApplied: data.amount,
-                InvoiceType: 'it_Invoice',
+                InvoiceType: 13,  // 13 = Factura de Deudores (OINV)
             }],
         };
 
         try {
             this.logger.log(`Registrando pago para ${data.parentCardCode}, monto: ${data.amount}`);
 
-            const response = await axios.post(
-                `${this.baseUrl}/IncomingPayments`,
+            const response = await this.axiosInstance.post(
+                '/IncomingPayments',
                 paymentPayload,
                 { headers: this.getHeaders() }
             );
@@ -249,7 +235,7 @@ export class SapServiceLayerService {
         await this.ensureSession();
 
         try {
-            const response = await axios.get(`${this.baseUrl}${endpoint}`, {
+            const response = await this.axiosInstance.get(endpoint, {
                 headers: this.getHeaders(),
             });
 
