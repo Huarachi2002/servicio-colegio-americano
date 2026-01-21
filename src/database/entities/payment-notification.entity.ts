@@ -84,7 +84,7 @@ export class PaymentNotification {
     @Column({ name: 'raw_payload', type: 'text', nullable: true })
     rawPayload: string;  // JSON del request original
 
-    @Column({ name: 'processed_at', type: 'timestamp', nullable: true })
+    @Column({ name: 'processed_at', type: 'datetime2', nullable: true })
     processedAt: Date;  // Fecha/hora cuando se procesó completamente
 
     @CreateDateColumn({ name: 'created_at' })
