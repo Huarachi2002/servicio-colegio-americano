@@ -148,7 +148,11 @@ export class ExternalApiController {
             }
 
             // Validar idempotencia de forma sincrónica
-            const existingNotification = await this.externalApiService.checkExistingNotification(dto.transactionId);
+            let existingNotification = null;
+            // Si el transactionId es null o vacio, no se puede validar idempotencia
+            if (dto.transactionId && dto.transactionId.length > 0) {
+                existingNotification = await this.externalApiService.checkExistingNotification(dto.transactionId);
+            }
 
             if (existingNotification) {
                 this.logger.log(`[${requestId}] Pago ya procesado: ${dto.transactionId}`);
