@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment } from '../../../database/entities/payment.entity';
 import { ExchangeRate } from '../../../database/entities/exchange-rate.entity';
 import { BnbService } from 'src/modules/external-api/services/bnb.service';
+import { CustomLoggerService } from 'src/common/logger';
 
 /**
  * PaymentService - Replica exacta de PaymentRepository de Laravel
@@ -11,7 +12,7 @@ import { BnbService } from 'src/modules/external-api/services/bnb.service';
  */
 @Injectable()
 export class PaymentService {
-    private readonly logger = new Logger(PaymentService.name);
+    private readonly logger: CustomLoggerService;
     private authToken: {
         token: string;
         datetime: Date;
@@ -23,7 +24,10 @@ export class PaymentService {
         @InjectRepository(ExchangeRate)
         private readonly exchangeRateRepository: Repository<ExchangeRate>,
         private readonly bnbService: BnbService,
-    ) { }
+        private readonly customLogger: CustomLoggerService,
+    ) {
+        this.logger = this.customLogger.setContext(PaymentService.name);
+    }
 
     /**
      * Guardar información de pago y generar QR
@@ -32,12 +36,25 @@ export class PaymentService {
         erpCode: string,
         debtInformation: any,
     ): Promise<string | null> {
-        this.logger.log('savePaymentInformation called');
-        this.logger.log(JSON.stringify(debtInformation));
+        const transactionId = debtInformation.idTransaccion || 'N/A';
+        
+        this.logger.logPaymentTransaction(transactionId, 'savePaymentInformation', 'INITIATED', {
+            erpCode,
+            amount: debtInformation.MontoDelCobro,
+            currency: debtInformation.MonedaDelCobro,
+        });
+        
+        this.logger.log(`savePaymentInformation called for erpCode: ${erpCode}`);
+        this.logger.debug(`Debt information: ${JSON.stringify(debtInformation)}`);
 
         try {
             const now = new Date();
             now.setHours(0, 0, 0, 0);
+
+            this.logger.logPaymentTransaction(transactionId, 'checkExistingPayment', 'PROCESSING', {
+                erpCode,
+                date: now.toISOString(),
+            });
 
             // Buscar pago existente
             const existingPayment = await this.paymentRepository.findOneBy({
@@ -47,6 +64,8 @@ export class PaymentService {
 
             // Si no existe, crear nuevo
             if (!existingPayment) {
+                this.logger.log(`No existing payment found for ${erpCode}, creating new one`);
+                
                 const glossAux = debtInformation.DetalleDelCobro;
                 const invoiceData = debtInformation.DatosFactura;
 
@@ -57,9 +76,15 @@ export class PaymentService {
 
                 // Validar NIT (solo números)
                 if (!/^\d+$/.test(invoiceData.NITCIFact)) {
-                    this.logger.warn('Invalid NIT format');
+                    this.logger.warn(`Invalid NIT format: ${invoiceData.NITCIFact}`);
+                    this.logger.logPaymentTransaction(transactionId, 'validateNIT', 'FAILED', {
+                        nit: invoiceData.NITCIFact,
+                        error: 'Invalid NIT format - must be numeric only',
+                    });
                     return null;
                 }
+
+                this.logger.logPaymentTransaction(transactionId, 'generateAdditionalData', 'PROCESSING');
 
                 // Generar additional data
                 const additionalData = await this.generateAdditionalData(
@@ -79,6 +104,12 @@ export class PaymentService {
                     debtInformation.MonedaDelCobro,
                 );
 
+                this.logger.logPaymentTransaction(transactionId, 'generateQR', 'PROCESSING', {
+                    amount: debtInformation.MontoDelCobro,
+                    currency: debtInformation.MonedaDelCobro,
+                    expirationDate,
+                });
+
                 // Generar QR desde API BNB
                 const qrResponse = await this.bnbService.generateQR(
                     additionalData,
@@ -89,6 +120,10 @@ export class PaymentService {
                 );
 
                 if (qrResponse && qrResponse.success) {
+                    this.logger.logPaymentTransaction(transactionId, 'savePayment', 'PROCESSING', {
+                        qrId: qrResponse.id,
+                    });
+
                     // Guardar payment en BD
                     const newPayment = this.paymentRepository.create({
                         erpCode,
@@ -101,18 +136,34 @@ export class PaymentService {
                     });
 
                     const savedPayment = await this.paymentRepository.save(newPayment);
+                    
+                    this.logger.logPaymentTransaction(transactionId, 'savePaymentInformation', 'COMPLETED', {
+                        paymentId: savedPayment.paymentId,
+                        erpCode: savedPayment.erpCode,
+                    });
+
                     return savedPayment.qr;
+                } else {
+                    this.logger.logPaymentTransaction(transactionId, 'generateQR', 'FAILED', {
+                        response: qrResponse,
+                    });
                 }
             }
 
             if (existingPayment) {
+                this.logger.log(`Returning existing payment QR for ${erpCode}`);
+                this.logger.logPaymentTransaction(transactionId, 'savePaymentInformation', 'COMPLETED', {
+                    status: 'existing_payment_found',
+                    paymentId: existingPayment.paymentId,
+                });
                 return existingPayment.qr;
             }
 
             return null;
         } catch (error) {
-            this.logger.error('Error en savePaymentInformation', {
-                message: error.message,
+            this.logger.error(`Error en savePaymentInformation: ${error.message}`, error.stack);
+            this.logger.logPaymentTransaction(transactionId, 'savePaymentInformation', 'FAILED', {
+                error: error.message,
                 stack: error.stack,
             });
             return null;

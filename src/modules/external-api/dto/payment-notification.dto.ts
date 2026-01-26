@@ -29,6 +29,14 @@ export class PaymentNotificationDto {
     @IsString()
     email?: string;  // Email para envío de factura
 
+    @IsOptional()
+    @IsString()
+    nroFactura?: string;  // Número de factura emitida
+
+    @IsOptional()
+    @IsString()
+    cuf?: string;  // Código Único de Factura
+
     @IsNumber()
     paymentMethod: number;  // Método de pago SIN (1=QR, 2=Tarjeta, etc.)
 

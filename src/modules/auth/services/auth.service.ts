@@ -4,11 +4,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MobileUser } from 'src/database/entities/mobile-user.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { Father } from 'src/database/entities/father.entity';
-import { Employee } from 'src/database/entities/employee.entity';
 import { DeviceService } from './device.service';
 import { JwtService } from '@nestjs/jwt';
 import { User } from 'src/database/entities/users.entity';
+import { CustomLoggerService } from 'src/common/logger';
 
 
 export enum EntityState {
@@ -24,7 +23,7 @@ export enum MobileUserType {
 
 @Injectable()
 export class AuthService {
-    private readonly logger = new Logger(AuthService.name);
+    private readonly logger: CustomLoggerService;
 
     constructor(
         @InjectRepository(MobileUser) private readonly mobileUserRepository: Repository<MobileUser>,
@@ -32,10 +31,15 @@ export class AuthService {
 
         private deviceService: DeviceService,
         private jwtService: JwtService,
-    ) { }
+        private readonly customLogger: CustomLoggerService,
+    ) {
+        this.logger = this.customLogger.setContext(AuthService.name);
+    }
 
     async attemptLogin(loginDto: LoginDto) {
-        this.logger.log('===========Login attempt for user: ' + loginDto.username + "===========");
+        this.logger.logIntegrationProcess('MOBILE_AUTH', 'attemptLogin', 'START', {
+            username: loginDto.username
+        })
         const { username, password } = loginDto;
 
         const user = await this.mobileUserRepository.findOneBy({
@@ -51,14 +55,19 @@ export class AuthService {
         }
 
         this.logger.log("Usuario autenticado exitosamente");
-        this.logger.log("========Fin Login attempt for user: " + loginDto.username + "===========")
+        this.logger.logIntegrationProcess('MOBILE_AUTH', 'attemptLogin', 'SUCCESS', {
+            user
+        })
 
         return user;
     }
 
     async sendLoginResponse(user: MobileUser, deviceToken?: string) {
 
-        this.logger.log("========Inicio sendLoginResponse for user: " + user.username + "===========")
+        this.logger.logIntegrationProcess('MOBILE_AUTH', 'sendLoginResponse', 'START', {
+            userId: user.id,
+            deviceTokenProvided: !!deviceToken,
+        })
 
 
         // Actualizar dispositivo si se proporciona token
@@ -74,7 +83,11 @@ export class AuthService {
         // Father = 0, Employee = 1, Student = 3
         const userType = this.getUserTypeFromEntityType(user.entity_type);
 
-        this.logger.log("=======Fin sendLoginResponse========");
+        this.logger.logIntegrationProcess('MOBILE_AUTH', 'sendLoginResponse', 'SUCCESS', {
+            userId: user.id,
+            apiToken,
+            userType,
+        })
 
         // Respuesta estructurada para la app móvil
         // La app espera: id, name, userType, entityType, entityId, apiToken
@@ -106,7 +119,10 @@ export class AuthService {
     }
 
     async loginWeb(loginDto: LoginDto): Promise<string> {
-        this.logger.log('===========Login attempt for web user: ' + loginDto.username + "===========");
+        this.logger.logIntegrationProcess('WEB_AUTH', 'loginWeb', 'START', {
+            username: loginDto.username
+        })
+        this.logger.log("========Inicio Login web user: " + loginDto.username + "===========")
         const { username, password } = loginDto;
         const user = await this.userRepository.findOneBy({
             username,

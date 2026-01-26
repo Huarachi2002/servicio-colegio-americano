@@ -49,6 +49,12 @@ export class PaymentNotification {
     @Column({ name: 'receipt_number', length: 100, nullable: true })
     receiptNumber: string;  // Número de recibo del banco
 
+    @Column({ length: 100, nullable: true })
+    nroFactura: string;  // Número de factura emitida
+
+    @Column({ length: 200, nullable: true })
+    cuf: string;  // Código Único de Factura
+
     @Column({ name: 'api_client_id' })
     apiClientId: number;
 

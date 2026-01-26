@@ -1,6 +1,8 @@
 export interface CreateInvoiceDto {
     transactionId: string;
     email: string;
+    nroFactura: string;
+    cuf: string;
     paymentMethod: number;
     parentCardCode: string;
     docDate: string;
@@ -41,6 +43,8 @@ export interface PaymentProcessResult {
 export interface ProcessPaymentDto {
     transactionId: string;
     email: string;
+    nroFactura: string;
+    cuf: string;
     paymentMethod: number;
     transferAccount: string;
     parentCardCode: string;

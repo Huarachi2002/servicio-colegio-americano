@@ -8,6 +8,7 @@ import { SapModule } from './modules/integrations/sap/sap.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SchoolModule } from './modules/school/school.module';
 import { ExternalApiModule } from './modules/external-api/external-api.module';
+import { LoggerModule } from './common/logger';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ExternalApiModule } from './modules/external-api/external-api.module';
         configService.get('database'),
       inject: [ConfigService],
     }),
+    LoggerModule,
     SapModule,
     AuthModule,
     SchoolModule,

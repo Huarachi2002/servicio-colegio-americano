@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,13 +15,14 @@ import { DebtConsultationResponse, FamilyPlanResponse, PendingDebtConsultationRe
 import { ProcessPaymentDto } from 'src/modules/integrations/sap/interfaces/sap.interface';
 import { ApiClient } from 'src/database/entities/api-client.entity';
 import { ConfigService } from '@nestjs/config';
+import { CustomLoggerService } from 'src/common/logger';
 
 /**
  * Servicio para la API externa (bancos y servicios externos)
  */
 @Injectable()
 export class ExternalApiService {
-    private readonly logger = new Logger(ExternalApiService.name);
+    private readonly logger: CustomLoggerService;
 
     constructor(
         @InjectRepository(PaymentNotification)
@@ -32,7 +33,10 @@ export class ExternalApiService {
         private readonly sapDebtService: SapDebtService,
         private readonly sapServiceLayerService: SapServiceLayerService,
         private readonly configService: ConfigService,
-    ) { }
+        private readonly customLogger: CustomLoggerService,
+    ) {
+        this.logger = this.customLogger.setContext(ExternalApiService.name);
+    }
 
     /**
      * Buscar deudores por method (ciOrNit | codAsociado)
@@ -41,6 +45,11 @@ export class ExternalApiService {
     async findDebtorsByDocument(method: string, document: string): Promise<DebtorInfo[]> {
         try {
             this.logger.log(`Buscando deudores por documento: ${document}`);
+            this.logger.logIntegrationProcess('SAP_QUERY', 'findDebtorsByDocument', 'START', {
+                method,
+                document,
+            });
+
             let filter = '';
             if (method === 'ciOrNit') {
                 filter = `(T0.LicTradNum = '${document}')`;
@@ -63,6 +72,9 @@ export class ExternalApiService {
             const results = await this.sapService.query<any>(query);
 
             if (!results || results.length === 0) {
+                this.logger.logIntegrationProcess('SAP_QUERY', 'findDebtorsByDocument', 'SUCCESS', {
+                    resultsCount: 0,
+                });
                 return [];
             }
 
@@ -89,9 +101,18 @@ export class ExternalApiService {
                 });
             }
 
-            return Array.from(debtorsMap.values());
+            const debtors = Array.from(debtorsMap.values());
+            this.logger.logIntegrationProcess('SAP_QUERY', 'findDebtorsByDocument', 'SUCCESS', {
+                resultsCount: debtors.length,
+                studentsCount: debtors.reduce((acc, d) => acc + d.students.length, 0),
+            });
+
+            return debtors;
         } catch (error) {
-            this.logger.error(`Error buscando deudores: ${error.message}`);
+            this.logger.error(`Error buscando deudores: ${error.message}`, error.stack);
+            this.logger.logIntegrationProcess('SAP_QUERY', 'findDebtorsByDocument', 'ERROR', {
+                error: error.message,
+            });
             throw error;
         }
     }
@@ -103,15 +124,29 @@ export class ExternalApiService {
     async getStudentDebts(studentCode: string): Promise<PendingDebtConsultationResponse | null> {
         try {
             this.logger.log(`Obteniendo deudas para estudiante: ${studentCode}`);
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getStudentDebts', 'START', { studentCode });
 
             const debtData = await this.sapDebtService.getPendingDebtConsultation(studentCode);
 
             if (!debtData || debtData.idProceso === 'False') {
+                this.logger.logIntegrationProcess('SAP_DEBT', 'getStudentDebts', 'SUCCESS', {
+                    studentCode,
+                    hasDebts: false,
+                });
                 return null;
             }
+
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getStudentDebts', 'SUCCESS', {
+                studentCode,
+                hasDebts: true,
+            });
             return debtData;
         } catch (error) {
-            this.logger.error(`Error obteniendo deudas: ${error.message}`);
+            this.logger.error(`Error obteniendo deudas: ${error.message}`, error.stack);
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getStudentDebts', 'ERROR', {
+                studentCode,
+                error: error.message,
+            });
             throw error;
         }
     }
@@ -119,15 +154,29 @@ export class ExternalApiService {
     async getFamilyDebts(parentCode: string): Promise<FamilyPlanResponse | null> {
         try {
             this.logger.log(`Obteniendo deudas para padre: ${parentCode}`);
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getFamilyDebts', 'START', { parentCode });
 
             const debtData = await this.sapDebtService.getPendingFamilyDebts(parentCode);
 
             if (!debtData) {
+                this.logger.logIntegrationProcess('SAP_DEBT', 'getFamilyDebts', 'SUCCESS', {
+                    parentCode,
+                    hasDebts: false,
+                });
                 return null;
             }
+
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getFamilyDebts', 'SUCCESS', {
+                parentCode,
+                hasDebts: true,
+            });
             return debtData;
         } catch (error) {
-            this.logger.error(`Error obteniendo deudas: ${error.message}`);
+            this.logger.error(`Error obteniendo deudas: ${error.message}`, error.stack);
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getFamilyDebts', 'ERROR', {
+                parentCode,
+                error: error.message,
+            });
             throw error;
         }
     }
@@ -139,12 +188,22 @@ export class ExternalApiService {
     async getPriorityDebt(studentCode: string): Promise<DebtConsultationResponse | null> {
         try {
             this.logger.log(`Obteniendo deuda prioritaria para: ${studentCode}`);
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getPriorityDebt', 'START', { studentCode });
 
             const debtData = await this.sapDebtService.getDebtConsultation(studentCode);
 
             if (!debtData || debtData.idProceso === 'False') {
+                this.logger.logIntegrationProcess('SAP_DEBT', 'getPriorityDebt', 'SUCCESS', {
+                    studentCode,
+                    hasDebts: false,
+                });
                 return null;
             }
+
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getPriorityDebt', 'SUCCESS', {
+                studentCode,
+                hasDebts: true,
+            });
 
             return debtData;
         } catch (error) {
@@ -208,6 +267,8 @@ export class ExternalApiService {
             paymentDate: new Date(dto.paymentDate),
             receiptNumber: dto.receiptNumber,
             rawPayload: JSON.stringify(dto),
+            nroFactura: dto.nroFactura,
+            cuf: dto.cuf,
         });
 
         return await this.paymentNotificationRepo.save(notification);
@@ -274,7 +335,9 @@ export class ExternalApiService {
 
                     const processData: ProcessPaymentDto = {
                         transactionId: dto.transactionId,
-                        email: dto.email,
+                        email: dto.email || '',
+                        nroFactura: dto.nroFactura || '',
+                        cuf: dto.cuf || '',
                         paymentMethod: dto.paymentMethod,
                         transferAccount: cuentaContableSap,
                         parentCardCode: dto.parentCardCode,
@@ -433,7 +496,9 @@ export class ExternalApiService {
 
                 const processData: ProcessPaymentDto = {
                     transactionId: dto.transactionId,
-                    email: dto.email,
+                    email: dto.email || '',
+                    nroFactura: dto.nroFactura || '',
+                    cuf: dto.cuf || '',
                     paymentMethod: dto.paymentMethod,
                     transferAccount: cuentaContableSap,
                     parentCardCode: dto.parentCardCode,

@@ -1,10 +1,19 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { CustomLoggerService } from './common/logger';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
+  
+  // Obtener el logger personalizado y configurarlo como logger global
+  const logger = await app.resolve(CustomLoggerService);
+  logger.setContext('Bootstrap');
+  app.useLogger(logger);
+
   const port = process.env.PORT ?? 8080;
 
   app.useGlobalPipes(new ValidationPipe());
@@ -33,8 +42,9 @@ async function bootstrap() {
   app.set('trust proxy', 1);
   
   await app.listen(port, '0.0.0.0', () => {
-    Logger.log(`Servidor ejecutándose en http://localhost:${port}`);
-    Logger.log(`Prefijo API: /api`);
+    logger.log(`Servidor ejecutándose en http://localhost:${port}`);
+    logger.log(`Prefijo API: /api`);
+    logger.log(`Logs guardados en: ${logger.getLogPath()}`);
   });
 }
 bootstrap();

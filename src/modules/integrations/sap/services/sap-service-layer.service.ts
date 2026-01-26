@@ -1,12 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import * as https from 'https';
 import { CreateInvoiceDto, CreatePaymentDto, PaymentProcessResult, ProcessPaymentDto, SapDocumentResponse } from '../interfaces/sap.interface';
+import { CustomLoggerService } from 'src/common/logger';
 
 @Injectable()
 export class SapServiceLayerService {
-    private readonly logger = new Logger(SapServiceLayerService.name);
+    private readonly logger: CustomLoggerService;
     private readonly baseUrl: string;
     private sessionId: string | null = null;
     private sessionExpiry: Date | null = null;
@@ -14,7 +15,11 @@ export class SapServiceLayerService {
     // Agente HTTPS que acepta certificados auto-firmados
     private readonly httpsAgent: https.Agent;
 
-    constructor(private readonly configService: ConfigService) {
+    constructor(
+        private readonly configService: ConfigService,
+        private readonly customLogger: CustomLoggerService,
+    ) {
+        this.logger = this.customLogger.setContext(SapServiceLayerService.name);
         this.baseUrl = configService.get<string>('SAP_SERVICE_LAYER_URL') || '';
 
         // Crear agente HTTPS que ignora validación de certificados (para certificados auto-firmados)
@@ -37,12 +42,22 @@ export class SapServiceLayerService {
      * Login en Service Layer - obtiene Session ID
      */
     async login(): Promise<void> {
+        const startTime = Date.now();
+        const url = `${this.baseUrl}/Login`;
+        
         try {
+            this.logger.logIntegrationProcess('SAP_SERVICE_LAYER', 'login', 'START', {
+                url,
+                companyDB: this.configService.get('SAP_COMPANY_DB'),
+            });
+
             const response = await this.axiosInstance.post('/Login', {
                 CompanyDB: this.configService.get('SAP_COMPANY_DB'),
                 UserName: this.configService.get('SAP_SL_USER'),
                 Password: this.configService.get('SAP_SL_PASSWORD'),
             });
+
+            const duration = Date.now() - startTime;
 
             // Session ID viene en cookie B1SESSION
             const cookies = response.headers['set-cookie'];
@@ -55,9 +70,41 @@ export class SapServiceLayerService {
 
             // Session expira en 30 minutos
             this.sessionExpiry = new Date(Date.now() + 30 * 60 * 1000);
+            
+            this.logger.logApiCall(
+                'SAP_SERVICE_LAYER',
+                'POST',
+                url,
+                { companyDB: this.configService.get('SAP_COMPANY_DB') },
+                { success: true },
+                response.status,
+                duration,
+                false,
+            );
+            
+            this.logger.logIntegrationProcess('SAP_SERVICE_LAYER', 'login', 'SUCCESS', {
+                duration: `${duration}ms`,
+            });
             this.logger.log('Login exitoso en SAP Service Layer');
         } catch (error) {
-            this.logger.error('Error en login SAP Service Layer:', error.message);
+            const duration = Date.now() - startTime;
+            
+            this.logger.logApiCall(
+                'SAP_SERVICE_LAYER',
+                'POST',
+                url,
+                { companyDB: this.configService.get('SAP_COMPANY_DB') },
+                error.response?.data,
+                error.response?.status,
+                duration,
+                true,
+            );
+            
+            this.logger.error(`Error en login SAP Service Layer: ${error.message}`, error.stack);
+            this.logger.logIntegrationProcess('SAP_SERVICE_LAYER', 'login', 'ERROR', {
+                error: error.message,
+                duration: `${duration}ms`,
+            });
             throw new Error('No se pudo conectar a SAP Service Layer');
         }
     }
@@ -74,7 +121,10 @@ export class SapServiceLayerService {
         // Payload simplificado - probado exitosamente en Insomnia
         const invoicePayload = {
             CardCode: data.parentCardCode,
+            NumAtCard: data.nroFactura,
+            U_B_cuf: data.cuf,
             DocDate: data.docDate,
+            U_EMAIL: data.email,
             DocDueDate: data.docDate,
             Comments: `Pago desde App/Web. Ref: ${data.transactionId}`,
             DocumentLines: data.orderLines.map(line => ({
@@ -84,8 +134,18 @@ export class SapServiceLayerService {
             })),
         };
 
+        const url = `${this.baseUrl}/Invoices`;
+        const startTime = Date.now();
+
         try {
             this.logger.log(`Creando factura para ${data.parentCardCode} con ${data.orderLines.length} líneas`);
+            this.logger.debug(`Payload factura: ${JSON.stringify(invoicePayload)}`);
+            
+            this.logger.logIntegrationProcess('SAP_INVOICE', 'createInvoiceFromOrder', 'START', {
+                parentCardCode: data.parentCardCode,
+                transactionId: data.transactionId,
+                linesCount: data.orderLines.length,
+            });
 
             const response = await this.axiosInstance.post(
                 '/Invoices',
@@ -93,7 +153,26 @@ export class SapServiceLayerService {
                 { headers: this.getHeaders() }
             );
 
+            const duration = Date.now() - startTime;
+
+            this.logger.logApiCall(
+                'SAP_SERVICE_LAYER',
+                'POST',
+                url,
+                invoicePayload,
+                { DocEntry: response.data.DocEntry, DocNum: response.data.DocNum },
+                response.status,
+                duration,
+                false,
+            );
+
             this.logger.log(`Factura creada: DocEntry=${response.data.DocEntry}, DocNum=${response.data.DocNum}`);
+            
+            this.logger.logIntegrationProcess('SAP_INVOICE', 'createInvoiceFromOrder', 'SUCCESS', {
+                docEntry: response.data.DocEntry,
+                docNum: response.data.DocNum,
+                duration: `${duration}ms`,
+            });
 
             return {
                 success: true,
@@ -101,8 +180,38 @@ export class SapServiceLayerService {
                 docNum: response.data.DocNum,
             };
         } catch (error) {
-            const errorMsg = error.response?.data?.error?.message?.value || error.message;
-            this.logger.error('Error creando factura en SAP:', errorMsg);
+            const duration = Date.now() - startTime;
+            
+            // Capturar el mensaje de error detallado de SAP
+            const sapError = error.response?.data?.error;
+            const errorMsg = sapError?.message?.value || sapError?.message || error.message;
+            const errorCode = sapError?.code || error.response?.status || 'UNKNOWN';
+            
+            this.logger.logApiCall(
+                'SAP_SERVICE_LAYER',
+                'POST',
+                url,
+                invoicePayload,
+                error.response?.data,
+                error.response?.status,
+                duration,
+                true,
+            );
+            
+            this.logger.error(`Error creando factura en SAP [${errorCode}]: ${errorMsg}`);
+            this.logger.error(`Payload enviado: ${JSON.stringify(invoicePayload)}`);
+            
+            // Log completo del error de SAP si existe
+            if (error.response?.data) {
+                this.logger.error(`Respuesta SAP completa: ${JSON.stringify(error.response.data)}`);
+            }
+            
+            this.logger.logIntegrationProcess('SAP_INVOICE', 'createInvoiceFromOrder', 'ERROR', {
+                errorCode,
+                errorMsg,
+                duration: `${duration}ms`,
+            });
+            
             return {
                 success: false,
                 error: errorMsg,
@@ -133,8 +242,18 @@ export class SapServiceLayerService {
             }],
         };
 
+        const url = `${this.baseUrl}/IncomingPayments`;
+        const startTime = Date.now();
+
         try {
             this.logger.log(`Registrando pago para ${data.parentCardCode}, monto: ${data.amount}`);
+            this.logger.debug(`Payload pago: ${JSON.stringify(paymentPayload)}`);
+            
+            this.logger.logIntegrationProcess('SAP_PAYMENT', 'createIncomingPayment', 'START', {
+                parentCardCode: data.parentCardCode,
+                amount: data.amount,
+                invoiceDocEntry: data.invoiceDocEntry,
+            });
 
             const response = await this.axiosInstance.post(
                 '/IncomingPayments',
@@ -142,7 +261,26 @@ export class SapServiceLayerService {
                 { headers: this.getHeaders() }
             );
 
+            const duration = Date.now() - startTime;
+
+            this.logger.logApiCall(
+                'SAP_SERVICE_LAYER',
+                'POST',
+                url,
+                paymentPayload,
+                { DocEntry: response.data.DocEntry, DocNum: response.data.DocNum },
+                response.status,
+                duration,
+                false,
+            );
+
             this.logger.log(`Pago registrado: DocEntry=${response.data.DocEntry}, DocNum=${response.data.DocNum}`);
+            
+            this.logger.logIntegrationProcess('SAP_PAYMENT', 'createIncomingPayment', 'SUCCESS', {
+                docEntry: response.data.DocEntry,
+                docNum: response.data.DocNum,
+                duration: `${duration}ms`,
+            });
 
             return {
                 success: true,
@@ -150,8 +288,38 @@ export class SapServiceLayerService {
                 docNum: response.data.DocNum,
             };
         } catch (error) {
-            const errorMsg = error.response?.data?.error?.message?.value || error.message;
-            this.logger.error('Error creando pago en SAP:', errorMsg);
+            const duration = Date.now() - startTime;
+            
+            // Capturar el mensaje de error detallado de SAP
+            const sapError = error.response?.data?.error;
+            const errorMsg = sapError?.message?.value || sapError?.message || error.message;
+            const errorCode = sapError?.code || error.response?.status || 'UNKNOWN';
+            
+            this.logger.logApiCall(
+                'SAP_SERVICE_LAYER',
+                'POST',
+                url,
+                paymentPayload,
+                error.response?.data,
+                error.response?.status,
+                duration,
+                true,
+            );
+            
+            this.logger.error(`Error creando pago en SAP [${errorCode}]: ${errorMsg}`);
+            this.logger.error(`Payload enviado: ${JSON.stringify(paymentPayload)}`);
+            
+            // Log completo del error de SAP si existe
+            if (error.response?.data) {
+                this.logger.error(`Respuesta SAP completa: ${JSON.stringify(error.response.data)}`);
+            }
+            
+            this.logger.logIntegrationProcess('SAP_PAYMENT', 'createIncomingPayment', 'ERROR', {
+                errorCode,
+                errorMsg,
+                duration: `${duration}ms`,
+            });
+            
             return {
                 success: false,
                 error: errorMsg,
@@ -164,13 +332,22 @@ export class SapServiceLayerService {
      */
     async processPaymentNotification(data: ProcessPaymentDto): Promise<PaymentProcessResult> {
         this.logger.log(`Procesando pago completo para ${data.parentCardCode}`);
+        this.logger.logPaymentTransaction(data.transactionId, 'processPaymentNotification', 'INITIATED', {
+            parentCardCode: data.parentCardCode,
+            amount: data.amount,
+            orderLinesCount: data.orderLines.length,
+        });
 
         // Paso 1: Crear Factura
+        this.logger.logPaymentTransaction(data.transactionId, 'createInvoice', 'PROCESSING');
+        
         const invoice = await this.createInvoiceFromOrder({
             transactionId: data.transactionId,
             // razonSocial: data.razonSocial,
             // nit: data.nit,
             email: data.email,
+            nroFactura: data.nroFactura || '',
+            cuf: data.cuf || '',
             paymentMethod: data.paymentMethod,
             // documentTypeIdentity: data.documentTypeIdentity,
             // complement: data.complement,
@@ -185,6 +362,10 @@ export class SapServiceLayerService {
         });
 
         if (!invoice.success) {
+            this.logger.logPaymentTransaction(data.transactionId, 'processPaymentNotification', 'FAILED', {
+                step: 'createInvoice',
+                error: invoice.error,
+            });
             return {
                 success: false,
                 error: `Error creando factura: ${invoice.error}`,
@@ -192,6 +373,11 @@ export class SapServiceLayerService {
         }
 
         // Paso 2: Registrar Pago
+        this.logger.logPaymentTransaction(data.transactionId, 'createPayment', 'PROCESSING', {
+            invoiceDocEntry: invoice.docEntry,
+            invoiceDocNum: invoice.docNum,
+        });
+        
         const payment = await this.createIncomingPayment({
             parentCardCode: data.parentCardCode,
             paymentDate: data.paymentDate,
@@ -202,6 +388,12 @@ export class SapServiceLayerService {
         });
 
         if (!payment.success) {
+            this.logger.logPaymentTransaction(data.transactionId, 'processPaymentNotification', 'FAILED', {
+                step: 'createPayment',
+                error: payment.error,
+                invoiceDocEntry: invoice.docEntry,
+                invoiceDocNum: invoice.docNum,
+            });
             return {
                 success: false,
                 invoiceDocEntry: invoice.docEntry,
@@ -209,6 +401,13 @@ export class SapServiceLayerService {
                 error: `Factura creada pero error registrando pago: ${payment.error}`,
             };
         }
+
+        this.logger.logPaymentTransaction(data.transactionId, 'processPaymentNotification', 'COMPLETED', {
+            invoiceDocEntry: invoice.docEntry,
+            invoiceDocNum: invoice.docNum,
+            paymentDocEntry: payment.docEntry,
+            paymentDocNum: payment.docNum,
+        });
 
         return {
             success: true,
