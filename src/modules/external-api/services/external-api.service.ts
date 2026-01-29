@@ -329,7 +329,7 @@ export class ExternalApiService {
                 this.logger.log(`[${requestId}] Pagos Enviandos al Connector: ${JSON.stringify(processData)}`);
 
                 const response = await this.connectorService.paymentNotificationHandler(processData);
-                if (response.status === 202) {
+                if (response.code === 202) {
                     notification.status = 'PROCESSED';
                     notification.sapSyncStatus = 'SYNCED';
                     notification.sapInvoiceDocEntry = 0;

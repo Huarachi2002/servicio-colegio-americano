@@ -33,13 +33,13 @@ export class ConnectorService {
         try {
             const response = await this.axiosInstance.post('/payment-notifications', notificationDto);
             if (response.data.code === 202) {
-                return { status: response.data.code, message: response.data.message };
+                return { code: response.data.code, message: response.data.message, data: response.data };
             } else {
                 this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'ERROR', { message: 'Unexpected response code', code: response.data.code, data: response.data });
             }
         } catch (error) {
             this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'ERROR', { message: 'Error calling Connector API', error });
-            return { status: 500, message: 'Error calling Connector API' };
+            return { code: 500, message: 'Error calling Connector API', data: null };
         }
     }
 }

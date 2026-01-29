@@ -1,4 +1,5 @@
 export interface ResponseDataConnector {
-    status: number,
+    code: number,
     message: string,
+    data: any,
 }
