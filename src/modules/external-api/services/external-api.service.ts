@@ -285,27 +285,24 @@ export class ExternalApiService {
     async processPaymentNotificationConnector(
         dto: PaymentNotificationDto,
         apiClientId: number,
-        requestId: string
+        requestId: string,
+        notificationId: number
     ): Promise<void> {
         try {
             const studentCount = dto.students?.length || 0;
             this.logger.log(`[${requestId}] Iniciando procesamiento async de pago: ${dto.transactionId} (${studentCount} estudiantes)`);
 
-            // Obtener notificación creada
-            const notification = await this.paymentNotificationRepo.findOne({
-                where: { externalTransactionId: dto.transactionId },
-            });
-
-            if (notification) {
-                this.logger.log(`[${requestId}] Pago ya procesado anteriormente transaccionId: ${dto.transactionId}`);
-                this.logger.log(`[${requestId}] Detalles notificación existente data: ${JSON.stringify(notification)}`);
+            const notification = await this.paymentNotificationRepo.findOne({ where: { id: notificationId } });
+            if (!notification) {
+                this.logger.error(`[${requestId}] Notificación con ID ${notificationId} no encontrada`);
                 return;
             }
 
             // Obtener configuracion del Cliente API
             const apiClient = await this.apiClientRepo.findOne({ where: { id: apiClientId } });
             if (!apiClient) {
-                throw new NotFoundException(`Cliente API con ID ${apiClientId} no encontrado`);
+                this.logger.error(`[${requestId}] Cliente API con ID ${apiClientId} no encontrado`);
+                return;
             }
 
             let cuentaContableSap = this.getCuentaContableForApiClient(apiClient.name, dto.paymentMethod, requestId);
@@ -329,16 +326,22 @@ export class ExternalApiService {
                     receiptNumber: dto.receiptNumber || '',
                     students: dto.students,
                 }
-                this.logger.log(`[${requestId}] Pagos Enviandos al Connector: ${JSON.stringify(processData)}` );
-                this.connectorService.paymentNotificationHandler(processData);
+                this.logger.log(`[${requestId}] Pagos Enviandos al Connector: ${JSON.stringify(processData)}`);
 
-                notification.status = 'PROCESSED';
-                notification.sapSyncStatus = 'SYNCED';
-                notification.sapInvoiceDocEntry = 0;
-                notification.sapInvoiceDocNum = 0;
-                notification.sapPaymentDocEntry = 0;
-                notification.sapPaymentDocNum = 0;
-                notification.processedAt = new Date();
+                const response = await this.connectorService.paymentNotificationHandler(processData);
+                if (response.status === 202) {
+                    notification.status = 'PROCESSED';
+                    notification.sapSyncStatus = 'SYNCED';
+                    notification.sapInvoiceDocEntry = 0;
+                    notification.sapInvoiceDocNum = 0;
+                    notification.sapPaymentDocEntry = 0;
+                    notification.sapPaymentDocNum = 0;
+                    notification.processedAt = new Date();
+                } else {
+                    notification.status = 'FAILED';
+                    notification.sapSyncStatus = 'ERROR';
+                    notification.sapSyncError = response.message;
+                }
             } catch (error) {
                 this.logger.error(`[${requestId}] Error enviando al Connector: ${error.message}`);
                 notification.status = 'FAILED';

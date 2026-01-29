@@ -174,7 +174,7 @@ export class ExternalApiController {
             const initialNotification = await this.externalApiService.createInitialNotification(dto, client.id, totalAmount);
 
             // Iniciar procesamiento en background
-            this.externalApiService.processPaymentNotificationConnector(dto, client.id, requestId).catch((error) => {
+            this.externalApiService.processPaymentNotificationConnector(dto, client.id, requestId, initialNotification.id).catch((error) => {
                 this.logger.error(`[${requestId}] Error en procesamiento async: ${error.message}`);
             });
 

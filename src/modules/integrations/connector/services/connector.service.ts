@@ -3,6 +3,7 @@ import { PaymentNotificationRequest } from "../interfaces/connector.interface";
 import { ConfigService } from "@nestjs/config";
 import { Injectable } from "@nestjs/common";
 import axios, { AxiosInstance } from 'axios';
+import { ResponseDataConnector } from "../interfaces/response.interface";
 
 @Injectable()
 export class ConnectorService {
@@ -27,18 +28,18 @@ export class ConnectorService {
         })
     }
 
-    async paymentNotificationHandler(notificationDto: PaymentNotificationRequest): Promise<void> {
-        this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'START', {notificationDto});
+    async paymentNotificationHandler(notificationDto: PaymentNotificationRequest): Promise<ResponseDataConnector> {
+        this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'START', { notificationDto });
         try {
             const response = await this.axiosInstance.post('/payment-notifications', notificationDto);
             if (response.data.code === 202) {
-                return;
-            }else {
-                this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'ERROR', {message: 'Unexpected response code', code: response.data.code, data: response.data});
+                return { status: response.data.code, message: response.data.message };
+            } else {
+                this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'ERROR', { message: 'Unexpected response code', code: response.data.code, data: response.data });
             }
         } catch (error) {
-            this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'ERROR', {message: 'Error calling Connector API', error});
-            return;
+            this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'ERROR', { message: 'Error calling Connector API', error });
+            return { status: 500, message: 'Error calling Connector API' };
         }
     }
 }
