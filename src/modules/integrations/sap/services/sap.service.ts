@@ -7,30 +7,35 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as sql from 'mssql';
 import { XMLParser } from 'fast-xml-parser';
-import { ConsultaDeudaPendienteXmlData, ConsultaDeudaXmlData } from '../interfaces/debt-consultation.interface';
+import { CustomLoggerService } from 'src/common/logger';
 
 /**
  * Servicio de conexión con SQL Server para SAP
  */
 @Injectable()
 export class SapService implements OnModuleInit, OnModuleDestroy {
-    private readonly logger = new Logger(SapService.name);
+    private readonly logger: CustomLoggerService
     private pool: sql.ConnectionPool;
     private xmlParser: XMLParser;
 
-    constructor(private configService: ConfigService) {
+    constructor(
+        private configService: ConfigService,
+        private customLogger: CustomLoggerService
+    ) {
         // Configurar parser XML
         this.xmlParser = new XMLParser({
             ignoreAttributes: false,
             parseTagValue: true,
             trimValues: true,
         });
+        this.logger = this.customLogger.setContext(SapService.name);
     }
 
     /**
      * Conectar a SQL Server al inicializar el módulo
      */
     async onModuleInit() {
+        this.logger.log('Conectando a SQL Server SAP...');
         try {
             const config = this.configService.get<sql.config>('sapDatabase');
             this.pool = new sql.ConnectionPool(config);
@@ -46,6 +51,7 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
      * Desconectar de SQL Server al destruir el módulo
      */
     async onModuleDestroy() {
+        this.logger.log('Desconectando de SQL Server...');
         if (this.pool) {
             await this.pool.close();
             this.logger.log('Desconectado de SQL Server');
@@ -69,7 +75,8 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
 
             // Ejecutar SP
             const result = await request.execute(procedureName);
-
+            this.logger.log(`${procedureName} ejecutado exitosamente`);
+            this.logger.debug(`Resultado bruto: ${JSON.stringify(result.recordset)}`);
             // El SP retorna XML en múltiples filas
             if (!result.recordset || result.recordset.length === 0) {
                 this.logger.warn(`No se obtuvieron datos para ${cardCode}`);
@@ -111,8 +118,10 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
      * Ejecutar query directa a SQL Server
      */
     async query<T = any>(queryString: string): Promise<T[]> {
+        this.logger.debug(`Ejecutando query: ${queryString}`);
         try {
             const result = await this.pool.request().query(queryString);
+            this.logger.log('Query ejecutada exitosamente');
             return result.recordset;
         } catch (error) {
             this.logger.error(`Error en query: ${error.message}`);
@@ -124,10 +133,12 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
      * Obtener tipo de cambio desde SQL Server
      */
     async getExchangeRate(): Promise<number> {
+        this.logger.log('Obteniendo tipo de cambio desde SAP');
         try {
             const result = await this.query<{ exchange_rate: number }>(
                 'SELECT TOP 1 exchange_rate FROM exchange_rates WHERE state = 1 ORDER BY created_at DESC',
             );
+            this.logger.log(`Tipo de cambio obtenido: ${result[0]?.exchange_rate}`);
             return result[0]?.exchange_rate || 6.96; // Default fallback
         } catch (error) {
             this.logger.warn('No se pudo obtener tipo de cambio, usando default');
@@ -136,10 +147,12 @@ export class SapService implements OnModuleInit, OnModuleDestroy {
     }
 
     async getDebtsState(studentErpCode: string): Promise<string | null> {
+        this.logger.log(`Obteniendo estado de deuda para estudiante: ${studentErpCode}`);
         try {
             const result = await this.query<{ state: string }>(
                 `SELECT U_Deuda as state FROM OCRD WHERE CardCode = '${studentErpCode}'`
             );
+            this.logger.log(`Estado de deuda obtenido: ${result[0]?.state}`);
             return result[0]?.state || null;
         } catch (error) {
             this.logger.warn('No se pudo obtener estado de deuda, usando default');

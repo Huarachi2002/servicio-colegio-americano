@@ -13,11 +13,12 @@ import { CreateUserMovil } from "../dto/create-user-movil.dto";
 import { UpdateUserMovil } from "../dto/update-user-movil.dto";
 import { PaymentNotification } from "src/database/entities/payment-notification.entity";
 import { ExchangeRate } from "src/database/entities/exchange-rate.entity";
+import { CustomLoggerService } from "src/common/logger";
 
 
 @Injectable()
 export class AdminService {
-    private readonly logger = new Logger(AdminService.name);
+    private readonly logger: CustomLoggerService;
 
     constructor(
         @InjectRepository(ApiClient)
@@ -30,7 +31,10 @@ export class AdminService {
         private readonly paymentNotificationRepository: Repository<PaymentNotification>,
         @InjectRepository(ExchangeRate)
         private readonly exchangeRateRepository: Repository<ExchangeRate>,
-    ) { }
+        private readonly customLogger: CustomLoggerService,
+    ) { 
+        this.logger = this.customLogger.setContext(AdminService.name);
+    }
 
     async getUsersWeb(): Promise<User[]> {
         this.logger.log('Obteniendo lista de usuarios');
@@ -48,6 +52,7 @@ export class AdminService {
         if (existingUser) {
             throw new ConflictException(`Usuario con username '${userData.username}' ya existe.`);
         }
+        this.logger.log(`No existe usuario con username '${userData.username}', procediendo a crear.`);
         const newUser = this.userRepository.create(userData);
         return await this.userRepository.save(newUser);
     }
@@ -58,6 +63,7 @@ export class AdminService {
         if (!existingUser) {
             throw new NotFoundException(`Usuario con ID '${userId}' no encontrado.`);
         }   
+        this.logger.log(`Usuario con ID '${userId}' encontrado, procediendo a actualizar.`);
         Object.assign(existingUser, userData);
         return await this.userRepository.save(existingUser);
     }
@@ -78,6 +84,7 @@ export class AdminService {
         if (existingUserMovil) {
             throw new ConflictException(`Usuario movil con username '${userData.username}' ya existe.`);
         }
+        this.logger.log(`No existe usuario movil con username '${userData.username}', procediendo a crear.`);
         const newUser = this.mobileUserRepository.create(userData);
         return await this.mobileUserRepository.save(newUser);
     }
@@ -88,6 +95,7 @@ export class AdminService {
         if (!existingUser) {
             throw new NotFoundException(`Usuario movil con ID '${userId}' no encontrado.`);
         }   
+        this.logger.log(`Usuario movil con ID '${userId}' encontrado, procediendo a actualizar.`);
         Object.assign(existingUser, userData);
         return await this.mobileUserRepository.save(existingUser);
     }
@@ -112,6 +120,7 @@ export class AdminService {
 
         // Generar API Key y su hash
         const { plainApiKey, hashedApiKey } = this.generateApiKeyWithHash();
+        this.logger.log(`API Key generada para nuevo cliente API: ${apiClient.name}`);
         
         const dataCliente = {
             name: apiClient.name,
@@ -121,9 +130,11 @@ export class AdminService {
             rateLimit: apiClient.rateLimit || 100
         }
 
+        this.logger.log(`Creando registro en base de datos para cliente API: ${apiClient.name}`);
+
         const newClient = this.apiClientRepository.create(dataCliente);
         const savedClient = await this.apiClientRepository.save(newClient);
-        
+        this.logger.log(`Cliente API creado exitosamente: ${apiClient.name}`);
         return Object.assign(savedClient, { plainApiKey });
     }
 
@@ -133,7 +144,7 @@ export class AdminService {
         if (!existingClient) {
             throw new NotFoundException(`Cliente API con ID '${id}' no encontrado.`);
         }
-
+        this.logger.log(`Cliente API con ID '${id}' encontrado, procediendo a actualizar.`);
         Object.assign(existingClient, apiClient);
         return await this.apiClientRepository.save(existingClient);
     }   
@@ -159,9 +170,11 @@ export class AdminService {
 
     private generateApiKeyWithHash(): { plainApiKey: string; hashedApiKey: string } {
         // Generar API Key aleatorio
+        this.logger.log('Generando nueva API Key');
         const plainApiKey = crypto.randomBytes(32).toString('hex');
         // Hashear con SHA256 para almacenar en BD (mismo hash siempre = búsqueda directa)
         const hashedApiKey = crypto.createHash('sha256').update(plainApiKey).digest('hex');
+        this.logger.log('API Key generada y hasheada exitosamente');
         return { plainApiKey, hashedApiKey };
     }
 
@@ -174,6 +187,7 @@ export class AdminService {
         if (!client) {
             throw new NotFoundException(`Cliente API con ID '${clientId}' no encontrado.`);
         }
+        this.logger.log(`Regenerando API Key para cliente: ${client.name}`);
 
         const { plainApiKey, hashedApiKey } = this.generateApiKeyWithHash();
         client.apiSecret = hashedApiKey;

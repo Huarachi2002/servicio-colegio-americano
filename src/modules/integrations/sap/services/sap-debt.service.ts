@@ -18,18 +18,24 @@ import {
     CuotaXmlData,
     StudentsDebtDetails,
 } from '../interfaces/debt-consultation.interface';
+import { CustomLoggerService } from 'src/common/logger';
 
 @Injectable()
 export class SapDebtService {
-    private readonly logger = new Logger(SapDebtService.name);
+    private readonly logger: CustomLoggerService;
 
-    constructor(private readonly sapService: SapService) { }
+    constructor(
+        private readonly sapService: SapService,
+        private readonly customLogger: CustomLoggerService,
+    ) {
+        this.logger = this.customLogger.setContext(SapDebtService.name);
+    }
 
     async getDebtConsultation(
         studentErpCode: string,
     ): Promise<DebtConsultationResponse | null> {
-        try {
-            this.logger.log(`Consultando deuda para estudiante: ${studentErpCode}`);
+        try {            
+            this.logger.logIntegrationProcess('SAP Debt Consultation', 'START', 'START', { studentErpCode });
 
             // Ejecutar stored procedure SP_A_ConsultaDeudaLaravel
             const result = await this.sapService.executeStoredProcedure<ConsultaDeudaXmlData>(
@@ -43,6 +49,7 @@ export class SapDebtService {
             }
 
             // Transformar respuesta XML a interface tipada
+            this.logger.logIntegrationProcess('SAP Debt Consultation', 'SUCCESS', 'SUCCESS', { result });
             return this.transformDebtResponse(result);
         } catch (error) {
             this.logger.error(
@@ -57,7 +64,7 @@ export class SapDebtService {
         studentErpCode: string,
     ): Promise<PendingDebtConsultationResponse | null> {
         try {
-            this.logger.log(`Consultando deuda pendiente para estudiante: ${studentErpCode}`);
+            this.logger.logIntegrationProcess('SAP Pending Debt Consultation', 'START', 'START', { studentErpCode });
 
             // Ejecutar stored procedure SP_B_ConsultaDeudaPendiente
             const result = await this.sapService.executeStoredProcedure<ConsultaDeudaPendienteXmlData>(
@@ -71,9 +78,10 @@ export class SapDebtService {
             }
 
             // Transformar respuesta XML a interface tipada
+            this.logger.logIntegrationProcess('SAP Pending Debt Consultation', 'SUCCESS', 'SUCCESS', { result });
             return this.transformPendingDebtResponse(result);
         } catch (error) {
-            this.logger.error(`Error obteniendo deuda pendiente: ${error.message}`);
+            this.logger.error(`Error obteniendo deuda pendiente: ${error.message}`, error.stack );
             return null;
         }
     }
@@ -82,7 +90,7 @@ export class SapDebtService {
         parentCode: string,
     ): Promise<FamilyPlanResponse | null> {
         try {
-            this.logger.log(`Consultando deuda pendiente para padre: ${parentCode} de sus hijos`);
+            this.logger.logIntegrationProcess('SAP Family Debt Consultation', 'START', 'START', { parentCode });
 
             // Ejecutar stored procedure SP_B_ConsultaDeudaFamiliar
             const result = await this.sapService.executeStoredProcedure<ConsultaDeudaFamiliarXmlData>(
@@ -96,9 +104,10 @@ export class SapDebtService {
             }
 
             // Transformar respuesta XML a interface tipada
+            this.logger.logIntegrationProcess('SAP Family Debt Consultation', 'SUCCESS', 'SUCCESS', { result });
             return this.transformFamilyDebtResponse(result);
         } catch (error) {
-            this.logger.error(`Error obteniendo deuda pendiente: ${error.message}`);
+            this.logger.error(`Error obteniendo deuda pendiente: ${error.message}`, error.stack);
             return null;
         }
     }

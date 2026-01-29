@@ -338,22 +338,17 @@ export class SapServiceLayerService {
             orderLinesCount: data.orderLines.length,
         });
 
+        this
+
         // Paso 1: Crear Factura
         this.logger.logPaymentTransaction(data.transactionId, 'createInvoice', 'PROCESSING');
         
         const invoice = await this.createInvoiceFromOrder({
             transactionId: data.transactionId,
-            // razonSocial: data.razonSocial,
-            // nit: data.nit,
             email: data.email,
             nroFactura: data.nroFactura || '',
             cuf: data.cuf || '',
             paymentMethod: data.paymentMethod,
-            // documentTypeIdentity: data.documentTypeIdentity,
-            // complement: data.complement,
-            // cuf: data.cuf,
-            // cufd: data.cufd,
-
             parentCardCode: data.parentCardCode,
             docDate: data.paymentDate,
             bankName: data.bankName,

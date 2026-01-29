@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -16,6 +16,8 @@ import { ProcessPaymentDto } from 'src/modules/integrations/sap/interfaces/sap.i
 import { ApiClient } from 'src/database/entities/api-client.entity';
 import { ConfigService } from '@nestjs/config';
 import { CustomLoggerService } from 'src/common/logger';
+import { PaymentNotificationRequest } from 'src/modules/integrations/connector/interfaces/connector.interface';
+import { ConnectorService } from 'src/modules/integrations/connector/services/connector.service';
 
 /**
  * Servicio para la API externa (bancos y servicios externos)
@@ -31,6 +33,7 @@ export class ExternalApiService {
         private readonly apiClientRepo: Repository<ApiClient>,
         private readonly sapService: SapService,
         private readonly sapDebtService: SapDebtService,
+        private readonly connectorService: ConnectorService,
         private readonly sapServiceLayerService: SapServiceLayerService,
         private readonly configService: ConfigService,
         private readonly customLogger: CustomLoggerService,
@@ -279,11 +282,10 @@ export class ExternalApiService {
      * Este método NO bloquea la respuesta HTTP
      * Soporta múltiples estudiantes: consolida orderLines de todos
      */
-    async processPaymentNotificationAsync(
+    async processPaymentNotificationConnector(
         dto: PaymentNotificationDto,
         apiClientId: number,
-        requestId: string,
-        totalAmount: number,
+        requestId: string
     ): Promise<void> {
         try {
             const studentCount = dto.students?.length || 0;
@@ -294,96 +296,58 @@ export class ExternalApiService {
                 where: { externalTransactionId: dto.transactionId },
             });
 
-            if (!notification) {
-                throw new Error(`Notificación ${dto.transactionId} no encontrada`);
+            if (notification) {
+                this.logger.log(`[${requestId}] Pago ya procesado anteriormente transaccionId: ${dto.transactionId}`);
+                this.logger.log(`[${requestId}] Detalles notificación existente data: ${JSON.stringify(notification)}`);
+                return;
             }
 
             // Obtener configuracion del Cliente API
             const apiClient = await this.apiClientRepo.findOne({ where: { id: apiClientId } });
             if (!apiClient) {
-                throw new Error(`Cliente API con ID ${apiClientId} no encontrado`);
+                throw new NotFoundException(`Cliente API con ID ${apiClientId} no encontrado`);
             }
 
-            let cuentaContableSap = '';
-            this.logger.log(`[${requestId}] Obteniendo cuenta contable SAP para cliente API: ${apiClient.name}`);
-            switch (apiClient.name) {
-                case 'BNB':
-                    cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BNB');
-                    break;
-                case 'BG':
-                    cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BG');
-                    break;
-                case 'LUKA':
-                    this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${dto.paymentMethod}`);
-                    if (dto.paymentMethod === 2) { // QR
-                        cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_QR');
-                    } else { // Tarjeta Debito/Crédito
-                        cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_TARJETA');
-                    }
-                    break;
-            }
+            let cuentaContableSap = this.getCuentaContableForApiClient(apiClient.name, dto.paymentMethod, requestId);
 
-            // Consolidar orderLines de todos los estudiantes
-            const consolidatedOrderLines = consolidateOrderLines(dto.students);
-            this.logger.log(`[${requestId}] Total de líneas consolidadas: ${consolidatedOrderLines.length} de ${studentCount} estudiantes`);
+            this.logger.log(`[${requestId}] Consolidando líneas de orden de ${studentCount} estudiantes`);
+            this.logger.log(`[${requestId}] Detalle estudiantes: ${JSON.stringify(dto.students)}`);
 
-            // Si SAP Service Layer está configurado y hay líneas, procesar
-            if (this.sapServiceLayerService.isConfigured() && consolidatedOrderLines.length > 0) {
-                try {
-                    notification.status = 'PROCESSING';
-                    await this.paymentNotificationRepo.save(notification);
-
-                    const processData: ProcessPaymentDto = {
-                        transactionId: dto.transactionId,
-                        email: dto.email || '',
-                        nroFactura: dto.nroFactura || '',
-                        cuf: dto.cuf || '',
-                        paymentMethod: dto.paymentMethod,
-                        transferAccount: cuentaContableSap,
-                        parentCardCode: dto.parentCardCode,
-                        paymentDate: dto.paymentDate,
-                        amount: totalAmount,
-                        bankName: 'Servicio Externo',
-                        externalReference: dto.transactionId,
-                        orderLines: consolidatedOrderLines.map(line => ({
-                            orderDocEntry: line.orderDocEntry,
-                            lineNum: line.lineNum,
-                        })),
-                    };
-
-                    const result = await this.sapServiceLayerService.processPaymentNotification(processData);
-
-                    if (result.success) {
-                        notification.status = 'PROCESSED';
-                        notification.sapSyncStatus = 'SYNCED';
-                        notification.sapInvoiceDocEntry = result.invoiceDocEntry;
-                        notification.sapInvoiceDocNum = result.invoiceDocNum;
-                        notification.sapPaymentDocEntry = result.paymentDocEntry;
-                        notification.sapPaymentDocNum = result.paymentDocNum;
-                        notification.processedAt = new Date();
-
-                        this.logger.log(`[${requestId}] Pago procesado exitosamente en SAP (${studentCount} estudiantes, ${consolidatedOrderLines.length} líneas)`);
-                    } else {
-                        notification.status = 'FAILED';
-                        notification.sapSyncStatus = 'ERROR';
-                        notification.sapSyncError = result.error;
-
-                        this.logger.error(`[${requestId}] Error en SAP: ${result.error}`);
-                    }
-                } catch (error) {
-                    this.logger.error(`[${requestId}] Error procesando en SAP: ${error.message}`);
-                    notification.status = 'FAILED';
-                    notification.sapSyncStatus = 'ERROR';
-                    notification.sapSyncError = error.message;
+            try {
+                notification.status = 'PROCESSING';
+                await this.paymentNotificationRepo.save(notification);
+                const processData: PaymentNotificationRequest = {
+                    transactionId: notification.id.toString(),
+                    email: dto.email || '',
+                    cuf: dto.cuf || '',
+                    currency: dto.currency,
+                    parentCardCode: dto.parentCardCode,
+                    paymentDate: dto.paymentDate,
+                    paymentMethod: dto.paymentMethod,
+                    transferAccount: cuentaContableSap,
+                    nroFactura: dto.nroFactura || '',
+                    receiptNumber: dto.receiptNumber || '',
+                    students: dto.students,
                 }
-            } else {
-                // Sin SAP Service Layer, marcar como procesado
+                this.logger.log(`[${requestId}] Pagos Enviandos al Connector: ${JSON.stringify(processData)}` );
+                this.connectorService.paymentNotificationHandler(processData);
+
                 notification.status = 'PROCESSED';
+                notification.sapSyncStatus = 'SYNCED';
+                notification.sapInvoiceDocEntry = 0;
+                notification.sapInvoiceDocNum = 0;
+                notification.sapPaymentDocEntry = 0;
+                notification.sapPaymentDocNum = 0;
                 notification.processedAt = new Date();
-                this.logger.log(`[${requestId}] Notificación marcada como procesada (sin SAP SL)`);
+            } catch (error) {
+                this.logger.error(`[${requestId}] Error enviando al Connector: ${error.message}`);
+                notification.status = 'FAILED';
+                notification.sapSyncStatus = 'ERROR';
+                notification.sapSyncError = error.message;
             }
 
             await this.paymentNotificationRepo.save(notification);
+            return;
         } catch (error) {
             this.logger.error(`[${requestId}] Error en procesamiento async: ${error.message}`);
 
@@ -441,24 +405,7 @@ export class ExternalApiService {
             throw new Error(`Cliente API con ID ${apiClientId} no encontrado`);
         }
 
-        let cuentaContableSap = '';
-        this.logger.log(`[${requestId}] Obteniendo cuenta contable SAP para cliente API: ${apiClient.name}`);
-        switch (apiClient.name) {
-            case 'BNB':
-                cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BNB');
-                break;
-            case 'BG':
-                cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BG');
-                break;
-            case 'LUKA':
-                this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${dto.paymentMethod}`);
-                if (dto.paymentMethod === 2) { // QR
-                    cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_QR');
-                } else { // Tarjeta debito/Crédito
-                    cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_TARJETA');
-                }
-                break;
-        }
+        let cuentaContableSap = this.getCuentaContableForApiClient(apiClient.name, dto.paymentMethod, requestId);
 
         // Consolidar información de estudiantes
         const studentCodes = getStudentCodesString(dto.students);
@@ -589,6 +536,28 @@ export class ExternalApiService {
         };
 
         return messages[status] || 'Estado desconocido';
+    }
+
+    private getCuentaContableForApiClient(apiClientName: string, paymentMethod: number, requestId: string): string {
+        let cuentaContableSap = '';
+        this.logger.log(`[${requestId}] Obteniendo cuenta contable SAP para cliente API: ${apiClientName}`);
+        switch (apiClientName) {
+            case 'BNB':
+                cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BNB');
+                break;
+            case 'BG':
+                cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_BG');
+                break;
+            case 'LUKA':
+                this.logger.log(`[${requestId}] Determinando cuenta contable SAP para LUKA con método de pago: ${paymentMethod}`);
+                if (paymentMethod === 2) { // QR
+                    cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_QR');
+                } else { // Tarjeta debito/Crédito
+                    cuentaContableSap = this.configService.get<string>('CUENTA_CONTABLE_LUKA_TARJETA');
+                }
+                break;
+        }
+        return cuentaContableSap;
     }
 
     /**

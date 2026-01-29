@@ -11,6 +11,7 @@ import { ExternalApiService } from './services/external-api.service';
 import { BnbService } from './services/bnb.service';
 import { ApiKeyStrategy } from './strategies/api-key.strategy';
 import { SapModule } from '../integrations/sap/sap.module';
+import { ConnectorModule } from '../integrations/connector/connector.module';
 
 @Module({
     imports: [
@@ -24,6 +25,7 @@ import { SapModule } from '../integrations/sap/sap.module';
         ConfigModule,
         HttpModule,
         SapModule,
+        ConnectorModule, 
     ],
     controllers: [
         ExternalApiController,

@@ -9,13 +9,14 @@ import { ExchangeRate } from '../../../database/entities/exchange-rate.entity';
 import { SapDebtService } from '../../integrations/sap/services/sap-debt.service';
 import { PaymentService } from './payment.service';
 import { SapService } from '../../integrations/sap/services/sap.service';
+import { CustomLoggerService } from 'src/common/logger';
 
 /**
  * SchoolService - Replica la lógica de SchoolApiService de Laravel
  */
 @Injectable()
 export class SchoolService {
-    private readonly logger = new Logger(SchoolService.name);
+    private readonly logger: CustomLoggerService;
 
     constructor(
         @InjectRepository(Student)
@@ -31,13 +32,17 @@ export class SchoolService {
         private readonly sapDebtService: SapDebtService,
         private readonly paymentService: PaymentService,
         private readonly sapService: SapService,
-    ) { }
+        private readonly customLogger: CustomLoggerService,
+    ) { 
+        this.logger = this.customLogger.setContext(SchoolService.name);
+    }
 
     /**
      * Obtener consulta de deuda
      * Replica: SchoolApiService::getDebtConsultation()
      */
     async getDebtConsultation(studentErpCode: string): Promise<any> {
+        this.logger.log(`Getting debt consultation for: ${studentErpCode}`);
         return await this.sapDebtService.getDebtConsultation(studentErpCode);
     }
 
@@ -46,6 +51,7 @@ export class SchoolService {
      * Replica: SchoolApiService::getPendingDebtConsultation()
      */
     async getPendingDebtConsultation(studentErpCode: string): Promise<any> {
+        this.logger.log(`Getting pending debt consultation for: ${studentErpCode}`);
         return await this.sapDebtService.getPendingDebtConsultation(
             studentErpCode,
         );
@@ -59,6 +65,7 @@ export class SchoolService {
         erpCode: string,
         debtInformation: any,
     ): Promise<string | null> {
+        this.logger.log(`Saving payment information for: ${erpCode}`);
         return await this.paymentService.savePaymentInformation(
             erpCode,
             debtInformation,
@@ -70,10 +77,12 @@ export class SchoolService {
      * Replica: SchoolApiService::getExchangeRate()
      */
     async getExchangeRate(): Promise<number> {
+        this.logger.log('Getting active exchange rate');
         const exchangeRate = await this.exchangeRateRepository.findOne({
             where: { enabled: true },
         });
 
+        this.logger.log(`Exchange rate found: ${exchangeRate?.exchangeRate}`);
         if (!exchangeRate) {
             this.logger.warn('No exchange rate found');
             return 0;
@@ -111,6 +120,7 @@ export class SchoolService {
      * Replica: SchoolApiService::getParallels()
      */
     async getParallels(): Promise<Parallel[]> {
+        this.logger.log('Getting parallels');
         return await this.parallelRepository.find();
     }
 
@@ -119,8 +129,9 @@ export class SchoolService {
      * Replica: SchoolApiController::getFather()
      */
     async getFatherById(id: number): Promise<string> {
+        this.logger.log(`Getting father ERP code for ID: ${id}`);
         const father = await this.fatherRepository.findOne({ where: { id } });
-
+        this.logger.log(`Father ERP code found: ${father?.erpCode}`);
         if (father) {
             return father.erpCode;
         }

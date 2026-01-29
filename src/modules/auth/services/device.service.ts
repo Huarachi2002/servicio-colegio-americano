@@ -4,15 +4,19 @@ import { Device } from "src/database/entities/device.entity";
 import { Repository } from "typeorm";
 import { DeviceStoreDto } from "../dto/device-store.dto";
 import { DeviceUpdateDto } from "../dto/device-update.dto";
+import { CustomLoggerService } from "src/common/logger";
 
 @Injectable()
 export class DeviceService {
 
-    private readonly logger = new Logger(DeviceService.name);
+    private readonly logger: CustomLoggerService;
 
     constructor(
         @InjectRepository(Device) private readonly deviceRepository: Repository<Device>,
-    ) { }
+        private readonly customLogger: CustomLoggerService,
+    ) { 
+        this.logger = this.customLogger.setContext(DeviceService.name);
+    }
 
     async storeDevice(deviceDto: DeviceStoreDto) {
         this.logger.log("========Guardando dispositivo========");

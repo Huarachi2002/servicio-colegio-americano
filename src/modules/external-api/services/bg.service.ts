@@ -2,17 +2,21 @@ import { HttpService } from "@nestjs/axios";
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { lastValueFrom } from "rxjs";
+import { CustomLoggerService } from "src/common/logger";
 
 
 @Injectable()
 export class BgService {
-    private readonly logger = new Logger(BgService.name);
+    private readonly logger: CustomLoggerService;
     private token: string = null;
 
     constructor(
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
-    ) { }
+        private readonly customLogger: CustomLoggerService,
+    ) { 
+        this.logger = this.customLogger.setContext(BgService.name);
+    }
 
     async authenticate(): Promise<string> {
         try {
@@ -79,7 +83,7 @@ export class BgService {
         const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
 
         if (isNaN(numericAmount) || numericAmount <= 0) {
-            this.logger.error('Amount inválido para generación de QR en BG:', amount);
+            this.logger.error(`Amount inválido para generación de QR en BG: ${amount}`);
             throw new HttpException(
                 'El monto debe ser un número mayor a 0',
                 HttpStatus.BAD_REQUEST
@@ -103,9 +107,10 @@ export class BgService {
                 'apiKey': this.configService.get('BG_API_KEY'),
             }
 
-            this.logger.log('Generando QR con datos: ', body);
-            this.logger.log('URL: ', url);
-            this.logger.log('Headers: ', headers);
+            // this.logger.log('Generando QR con datos: ', body);
+            this.logger.log(`Generando QR con datos: ${body}`);
+            this.logger.log(`URL: ${url}`);
+            this.logger.log(`Headers: ${JSON.stringify(headers)}`);
 
             const response = await lastValueFrom(this.httpService.post(url, body, { headers }));
             this.logger.log('QR generado exitosamente');
