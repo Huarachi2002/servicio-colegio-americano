@@ -31,7 +31,7 @@ export class ConnectorService {
     async paymentNotificationHandler(notificationDto: PaymentNotificationRequest): Promise<ResponseDataConnector> {
         this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'START', { notificationDto });
         try {
-            const response = await this.axiosInstance.post('/payment-notifications', notificationDto);
+            const response = await this.axiosInstance.post('/Payment/Payments', notificationDto);
             if (response.data.code === 202) {
                 return { code: response.data.code, message: response.data.message, data: response.data };
             } else {
