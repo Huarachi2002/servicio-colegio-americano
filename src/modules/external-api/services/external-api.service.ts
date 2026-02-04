@@ -320,7 +320,7 @@ export class ExternalApiService {
                     currency: dto.currency,
                     parentCardCode: dto.parentCardCode,
                     paymentDate: dto.paymentDate,
-                    paymentMethod: dto.paymentMethod,
+                    sinPaymentMethod: dto.paymentMethod,
                     transferAccount: cuentaContableSap,
                     nroFactura: dto.nroFactura || '',
                     receiptNumber: dto.receiptNumber || '',

@@ -8,7 +8,7 @@ export interface PaymentNotificationRequest {
     email?: string;  // Email para envío de factura
     nroFactura?: string;  // Número de factura emitida
     cuf?: string;  // Código Único de Factura
-    paymentMethod: number;  // Método de pago SIN (1=QR, 2=Tarjeta, etc.)
+    sinPaymentMethod: number;  // Método de pago SIN (1=QR, 2=Tarjeta, etc.)
     students: StudentPaymentDetail[];  // Estudiantes con sus líneas a pagar
 } 
 
