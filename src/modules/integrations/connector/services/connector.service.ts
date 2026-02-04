@@ -33,13 +33,32 @@ export class ConnectorService {
         try {
             const response = await this.axiosInstance.post('/Payment/Payments', notificationDto);
             if (response.data.code === 202) {
+                this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'SUCCESS', { code: response.data.code });
                 return { code: response.data.code, message: response.data.message, data: response.data };
             } else {
-                this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'ERROR', { message: 'Unexpected response code', code: response.data.code, data: response.data });
+                this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'ERROR', { 
+                    message: 'Unexpected response code', 
+                    code: response.data.code 
+                });
+                return { code: response.data.code || 500, message: response.data.message || 'Unexpected response', data: response.data };
             }
         } catch (error) {
-            this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'ERROR', { message: 'Error calling Connector API', error });
-            return { code: 500, message: 'Error calling Connector API', data: null };
+            const errorInfo = {
+                message: error?.message || 'Unknown error',
+                code: error?.code,
+                status: error?.response?.status,
+                statusText: error?.response?.statusText,
+                responseData: error?.response?.data
+            };
+            this.logger.logIntegrationProcess('ConnectorService', 'paymentNotificationHandler', 'ERROR', { 
+                message: 'Error calling Connector API', 
+                error: errorInfo 
+            });
+            return { 
+                code: error?.response?.status || 500, 
+                message: error?.message || 'Error calling Connector API', 
+                data: null 
+            };
         }
     }
 }
