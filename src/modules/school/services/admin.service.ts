@@ -14,6 +14,7 @@ import { UpdateUserMovil } from "../dto/update-user-movil.dto";
 import { PaymentNotification } from "src/database/entities/payment-notification.entity";
 import { ExchangeRate } from "src/database/entities/exchange-rate.entity";
 import { CustomLoggerService } from "src/common/logger";
+import { Rol } from "src/database/entities/roles.entity";
 
 
 @Injectable()
@@ -31,6 +32,8 @@ export class AdminService {
         private readonly paymentNotificationRepository: Repository<PaymentNotification>,
         @InjectRepository(ExchangeRate)
         private readonly exchangeRateRepository: Repository<ExchangeRate>,
+        @InjectRepository(Rol)
+        private readonly rolRepository: Repository<Rol>,
         private readonly customLogger: CustomLoggerService,
     ) { 
         this.logger = this.customLogger.setContext(AdminService.name);
@@ -53,7 +56,13 @@ export class AdminService {
             throw new ConflictException(`Usuario con username '${userData.username}' ya existe.`);
         }
         this.logger.log(`No existe usuario con username '${userData.username}', procediendo a crear.`);
+        const rol = await this.rolRepository.findOne({ where: { id: userData.roleId } });
+        if (!rol) {
+            throw new NotFoundException(`Rol con ID '${userData.roleId}' no encontrado.`);
+        }
         const newUser = this.userRepository.create(userData);
+        newUser.rol = rol;
+        newUser.type = rol.description.toLowerCase();
         return await this.userRepository.save(newUser);
     }
 
@@ -65,6 +74,14 @@ export class AdminService {
         }   
         this.logger.log(`Usuario con ID '${userId}' encontrado, procediendo a actualizar.`);
         Object.assign(existingUser, userData);
+        if (userData.roleId) {
+            const rol = await this.rolRepository.findOne({ where: { id: userData.roleId } });
+            if (!rol) {
+                throw new NotFoundException(`Rol con ID '${userData.roleId}' no encontrado.`);
+            }
+            existingUser.rol = rol;
+            existingUser.type = rol.description.toLowerCase();
+        }
         return await this.userRepository.save(existingUser);
     }
 

@@ -18,6 +18,7 @@ import { PaymentNotification } from '../../database/entities/payment-notificatio
 import { SapModule } from '../integrations/sap/sap.module';
 import { ExternalApiModule } from '../external-api/external-api.module';
 import { AuthModule } from '../auth/auth.module';
+import { Rol } from 'src/database/entities/roles.entity';
 
 @Module({
     imports: [
@@ -32,6 +33,7 @@ import { AuthModule } from '../auth/auth.module';
             Parallel,
             Payment,
             ExchangeRate,
+            Rol
         ]),
 
         AuthModule,
