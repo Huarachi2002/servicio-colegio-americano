@@ -3,6 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { ApiClient } from "src/database/entities/api-client.entity";
 import { User } from "src/database/entities/users.entity";
 import { Repository } from "typeorm";
+import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { CreateApiClient } from "../dto/create-api-client.dto";
 import { UpdateApiClient } from "../dto/update-api-client.dto";
@@ -63,6 +64,7 @@ export class AdminService {
         const newUser = this.userRepository.create(userData);
         newUser.rol = rol;
         newUser.type = rol.description.toLowerCase();
+        newUser.password = await bcrypt.hash(newUser.password, 10);
         return await this.userRepository.save(newUser);
     }
 
@@ -80,6 +82,7 @@ export class AdminService {
                 throw new NotFoundException(`Rol con ID '${userData.roleId}' no encontrado.`);
             }
             existingUser.rol = rol;
+            existingUser.password = userData.password ? await bcrypt.hash(userData.password, 10) : existingUser.password;
             existingUser.type = rol.description.toLowerCase();
         }
         return await this.userRepository.save(existingUser);
