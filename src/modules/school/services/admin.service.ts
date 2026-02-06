@@ -185,6 +185,33 @@ export class AdminService {
         return activeExchangeRate.exchangeRate;
     }
 
+    async getRoles(): Promise<Rol[]> {
+        this.logger.log('Obteniendo lista de roles');
+        return await this.rolRepository.find();
+    }
+
+    async createRol(description: string): Promise<Rol> {
+        this.logger.log(`Creando nuevo rol: ${description}`);
+        const existingRol = await this.rolRepository.findOne({ where: { description } });
+        if (existingRol) {
+            throw new ConflictException(`Rol con descripción '${description}' ya existe.`);
+        }
+        this.logger.log(`No existe rol con descripción '${description}', procediendo a crear.`);
+        const newRol = this.rolRepository.create({ description });
+        return await this.rolRepository.save(newRol);
+    }
+
+    async updateRol(id: number, description: string): Promise<Rol> {
+        this.logger.log(`Actualizando rol ID: ${id} con nueva descripción: ${description}`);
+        const existingRol = await this.rolRepository.findOne({ where: { id } });
+        if (!existingRol) {
+            throw new NotFoundException(`Rol con ID '${id}' no encontrado.`);
+        }
+        this.logger.log(`Rol con ID '${id}' encontrado, procediendo a actualizar.`);
+        existingRol.description = description;
+        return await this.rolRepository.save(existingRol);
+    }
+
     private generateApiKeyWithHash(): { plainApiKey: string; hashedApiKey: string } {
         // Generar API Key aleatorio
         this.logger.log('Generando nueva API Key');

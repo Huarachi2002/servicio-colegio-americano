@@ -10,6 +10,8 @@ import { CreateUserMovil } from "../dto/create-user-movil.dto";
 import { JwtAuthGuard } from "../../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../../common/decorators/current-user.decorator";
 import { User } from "../../../database/entities/users.entity";
+import { CreateRol } from "../dto/create-rol.dto";
+import { UpdateRol } from "../dto/update-rol.dto";
 
 /**
  * AdminController - Endpoints de administración para usuarios web
@@ -281,5 +283,63 @@ export class AdminController {
             }
         }
         
+    }
+
+    @Get('roles')
+    async getRoles(): Promise<ApiResponseWeb<any>> {
+        this.logger.log('Obteniendo lista de roles');
+        try {
+            const data = await this.adminService.getRoles();
+            return {
+                success: true,
+                message: 'Roles obtenidos exitosamente',
+                data,
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: error.message,
+                data: null,
+            }
+        }
+    }
+
+    @Post('rol')
+    async createRol(@Body() createRolDto: CreateRol): Promise<ApiResponseWeb<any>> {
+        this.logger.log(`Creando nuevo rol con descripción: ${createRolDto.description}`);
+        try {
+            const data = await this.adminService.createRol(createRolDto.description);
+            return {
+                success: true,
+                message: 'Rol creado exitosamente',
+                data,
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: error.message,
+                data: null,
+            }
+        }
+    }
+    
+    @Put('rol/:id')
+    async updateRol(@Param('id') id: string, @Body() updateRolDto: UpdateRol): Promise<ApiResponseWeb<any>> {
+        this.logger.log(`Actualizando rol con ID: ${id}`);
+        try {
+            const data = await this.adminService.updateRol(Number(id), updateRolDto.description);
+            return {
+                success: true,
+                message: 'Rol actualizado exitosamente',
+                data,
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: error.message,
+                data: null,
+            }
+        }
+
     }
 }
