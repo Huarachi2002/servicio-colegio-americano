@@ -89,7 +89,7 @@ export class SapSyncService {
                     CardName,
                     CardType,
                     LicTradNum AS FederalTaxID,
-                    E_MaiL AS EmailAddress,
+                    E_Mail AS EmailAddress,
                     Phone1,
                     ValidFor,
                     GroupCode
@@ -124,7 +124,7 @@ export class SapSyncService {
                     CardName,
                     CardType,
                     LicTradNum AS FederalTaxID,
-                    E_MaiL AS EmailAddress,
+                    E_Mail AS EmailAddress,
                     Phone1,
                     ValidFor,
                     GroupCode
@@ -155,7 +155,7 @@ export class SapSyncService {
                     CardCode,
                     CntctCode,
                     Name,
-                    E_Mail,
+                    E_MaiL,
                     Tel1,
                     Active
                 FROM OCPR
