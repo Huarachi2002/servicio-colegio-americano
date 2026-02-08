@@ -79,7 +79,7 @@ export interface SapContactPerson {
     CardCode: string;           // Código del Socio de Negocio (padre)
     CntctCode: number;          // Código interno de la persona de contacto
     Name: string;               // Nombre completo del estudiante
-    E_Mail?: string;            // Email del estudiante
+    E_MaiL?: string;            // Email del estudiante
     Tel1?: string;              // Teléfono
     Active: string;             // 'Y' = Activo, 'N' = Inactivo
 }

@@ -89,7 +89,7 @@ export class SapSyncService {
                     CardName,
                     CardType,
                     LicTradNum AS FederalTaxID,
-                    E_Mail AS EmailAddress,
+                    E_MaiL AS EmailAddress,
                     Phone1,
                     ValidFor,
                     GroupCode
@@ -124,7 +124,7 @@ export class SapSyncService {
                     CardName,
                     CardType,
                     LicTradNum AS FederalTaxID,
-                    E_Mail AS EmailAddress,
+                    E_MaiL AS EmailAddress,
                     Phone1,
                     ValidFor,
                     GroupCode
@@ -376,7 +376,7 @@ export class SapSyncService {
                         student = this.studentRepository.create({
                             name: contact.Name,
                             erpCode: erpCode,
-                            email: contact.E_Mail || '',
+                            email: contact.E_MaiL || '',
                             father_id: fatherId,
                             state: contact.Active === 'Y' ? 1 : 0,
                         });
@@ -386,7 +386,7 @@ export class SapSyncService {
                         // Actualizar estudiante existente
                         action = 'updated';
                         student.name = contact.Name;
-                        student.email = contact.E_Mail || student.email;
+                        student.email = contact.E_MaiL || student.email;
                         student.father_id = fatherId;
                         student.state = contact.Active === 'Y' ? 1 : 0;
                         await this.studentRepository.save(student);
