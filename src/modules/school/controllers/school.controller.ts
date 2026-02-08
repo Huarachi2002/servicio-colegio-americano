@@ -173,10 +173,28 @@ export class SchoolController {
                 };
             }
 
+            // Transformar a formato snake_case para Flutter
+            const transformedStudents = students.map(student => ({
+                id: student.id,
+                name: student.name,
+                erp_code: student.erpCode,
+                email: student.email,
+                invoice_name: null,
+                nit: null,
+                state: student.state,
+                father_id: student.father_id,
+                grade_id: student.gradeId,
+                parallel_id: student.parallelId,
+                price_list_id: null,
+                created_by: null,
+                created_at: student.createdAt?.toISOString() || null,
+                updated_at: student.updatedAt?.toISOString() || null,
+            }));
+
             return {
                 status: 'success',
                 message: 'Students retrieved',
-                data: students,
+                data: transformedStudents,
             };
         } catch (error) {
             throw new HttpException(
