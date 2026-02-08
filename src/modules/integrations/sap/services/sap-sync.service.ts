@@ -155,7 +155,7 @@ export class SapSyncService {
                     CardCode,
                     CntctCode,
                     Name,
-                    E_MaiL,
+                    E_MailL,
                     Tel1,
                     Active
                 FROM OCPR
@@ -376,7 +376,7 @@ export class SapSyncService {
                         student = this.studentRepository.create({
                             name: contact.Name,
                             erpCode: erpCode,
-                            email: contact.E_MaiL || '',
+                            email: contact.E_MailL || '',
                             father_id: fatherId,
                             state: contact.Active === 'Y' ? 1 : 0,
                         });
@@ -386,7 +386,7 @@ export class SapSyncService {
                         // Actualizar estudiante existente
                         action = 'updated';
                         student.name = contact.Name;
-                        student.email = contact.E_MaiL || student.email;
+                        student.email = contact.E_MailL || student.email;
                         student.father_id = fatherId;
                         student.state = contact.Active === 'Y' ? 1 : 0;
                         await this.studentRepository.save(student);
