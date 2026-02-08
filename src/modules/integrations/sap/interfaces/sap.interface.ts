@@ -73,6 +73,30 @@ export interface SapBusinessPartner {
 }
 
 /**
+ * Interfaz para Persona de Contacto de SAP (Estudiante)
+ */
+export interface SapContactPerson {
+    CardCode: string;           // Código del Socio de Negocio (padre)
+    CntctCode: number;          // Código interno de la persona de contacto
+    Name: string;               // Nombre completo del estudiante
+    E_Mail?: string;            // Email del estudiante
+    Tel1?: string;              // Teléfono
+    Active: string;             // 'Y' = Activo, 'N' = Inactivo
+}
+
+/**
+ * Resultado de sincronización de un estudiante
+ */
+export interface StudentSyncResult {
+    studentName: string;
+    erpCode: string;
+    success: boolean;
+    action: 'created' | 'updated' | 'skipped' | 'error';
+    message?: string;
+    error?: string;
+}
+
+/**
  * Resultado de sincronización de un usuario
  */
 export interface UserSyncResult {
@@ -83,6 +107,8 @@ export interface UserSyncResult {
     action: 'created' | 'updated' | 'skipped' | 'error';
     message?: string;
     error?: string;
+    students?: StudentSyncResult[];  // Agregar estudiantes sincronizados
+    studentsCount?: number;           // Cantidad de estudiantes
 }
 
 /**

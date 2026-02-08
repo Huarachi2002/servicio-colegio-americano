@@ -4,8 +4,9 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { MobileUser } from 'src/database/entities/mobile-user.entity';
 import { Father } from 'src/database/entities/father.entity';
+import { Student } from 'src/database/entities/student.entity';
 import { SapService } from './sap.service';
-import { SapBusinessPartner, UserSyncResult, MassSyncResult, SyncJobState, SyncStatus } from '../interfaces/sap.interface';
+import { SapBusinessPartner, SapContactPerson, UserSyncResult, StudentSyncResult, MassSyncResult, SyncJobState, SyncStatus } from '../interfaces/sap.interface';
 import { SyncUsersFilterDto } from '../dto/sync-user.dto';
 import { CustomLoggerService } from 'src/common/logger';
 
@@ -20,6 +21,8 @@ export class SapSyncService {
         private readonly mobileUserRepository: Repository<MobileUser>,
         @InjectRepository(Father)
         private readonly fatherRepository: Repository<Father>,
+        @InjectRepository(Student)
+        private readonly studentRepository: Repository<Student>,
         private readonly sapService: SapService,
         private readonly customLogger: CustomLoggerService,
     ) {
@@ -137,6 +140,38 @@ export class SapSyncService {
         } catch (error) {
             this.logger.error(`Error obteniendo socio de negocio ${cardCode}:`, error.message);
             return null;
+        }
+    }
+
+    /**
+     * Obtiene las personas de contacto (estudiantes) de un Socio de Negocio desde SAP
+     */
+    async getContactPersonsFromSAP(cardCode: string): Promise<SapContactPerson[]> {
+        this.logger.log(`Obteniendo personas de contacto para socio ${cardCode} desde SAP`);
+        try {
+            // En SAP, las personas de contacto están en la tabla OCPR
+            const query = `
+                SELECT 
+                    CardCode,
+                    CntctCode,
+                    Name,
+                    E_Mail,
+                    Tel1,
+                    Active
+                FROM OCPR
+                WHERE CardCode = '${cardCode}'
+                AND Active = 'Y'
+                ORDER BY CntctCode
+            `;
+
+            this.logger.debug(`Ejecutando query: ${query}`);
+            
+            const result = await this.sapService.query<SapContactPerson>(query);
+            this.logger.log(`Se obtuvieron ${result.length} personas de contacto para ${cardCode}`);
+            return result;
+        } catch (error) {
+            this.logger.error(`Error obteniendo personas de contacto para ${cardCode}:`, error.message);
+            return [];
         }
     }
 
@@ -273,6 +308,12 @@ export class SapSyncService {
                 await this.mobileUserRepository.save(mobileUser);
                 this.logger.log(`Actualizado usuario móvil ${mobileUser.username} para ${CardCode}`);
             }
+
+            // 3. Sincronizar estudiantes (personas de contacto) del padre
+            this.logger.log(`Sincronizando estudiantes para padre ${CardCode}`);
+            const studentResults = await this.syncStudentsForFather(CardCode, father.id);
+            this.logger.log(`Se sincronizaron ${studentResults.length} estudiantes para ${CardCode}`);
+
             this.logger.log(`Sincronización de socio de negocio ${CardCode} completada exitosamente`);
             return {
                 cardCode: CardCode,
@@ -281,6 +322,8 @@ export class SapSyncService {
                 success: true,
                 action,
                 message: `Usuario ${action === 'created' ? 'creado' : 'actualizado'} exitosamente`,
+                students: studentResults,
+                studentsCount: studentResults.length,
             };
         } catch (error) {
             this.logger.error(`Error guardando usuario ${CardCode}:`, error.message);
@@ -292,6 +335,88 @@ export class SapSyncService {
                 action: 'error',
                 error: error.message,
             };
+        }
+    }
+
+    /**
+     * Sincroniza los estudiantes (personas de contacto) de un padre desde SAP
+     */
+    private async syncStudentsForFather(cardCode: string, fatherId: number): Promise<StudentSyncResult[]> {
+        this.logger.log(`Sincronizando estudiantes para padre CardCode: ${cardCode}, FatherId: ${fatherId}`);
+        const results: StudentSyncResult[] = [];
+
+        try {
+            // Obtener personas de contacto desde SAP
+            const contactPersons = await this.getContactPersonsFromSAP(cardCode);
+            
+            if (contactPersons.length === 0) {
+                this.logger.log(`No se encontraron personas de contacto para ${cardCode}`);
+                return results;
+            }
+
+            this.logger.log(`Procesando ${contactPersons.length} personas de contacto para ${cardCode}`);
+
+            // Sincronizar cada persona de contacto como estudiante
+            for (const contact of contactPersons) {
+                try {
+                    // El CntctCode se usa como erpCode del estudiante
+                    const erpCode = cardCode + '-' + contact.CntctCode;
+                    
+                    this.logger.log(`Procesando estudiante ${contact.Name} (ERP: ${erpCode})`);
+
+                    // Buscar si el estudiante ya existe
+                    let student = await this.studentRepository.findOne({
+                        where: { erpCode },
+                    });
+
+                    let action: 'created' | 'updated' = 'created';
+
+                    if (!student) {
+                        // Crear nuevo estudiante
+                        student = this.studentRepository.create({
+                            name: contact.Name,
+                            erpCode: erpCode,
+                            email: contact.E_Mail || '',
+                            father_id: fatherId,
+                            state: contact.Active === 'Y' ? 1 : 0,
+                        });
+                        await this.studentRepository.save(student);
+                        this.logger.log(`Estudiante creado: ${contact.Name} (${erpCode})`);
+                    } else {
+                        // Actualizar estudiante existente
+                        action = 'updated';
+                        student.name = contact.Name;
+                        student.email = contact.E_Mail || student.email;
+                        student.father_id = fatherId;
+                        student.state = contact.Active === 'Y' ? 1 : 0;
+                        await this.studentRepository.save(student);
+                        this.logger.log(`Estudiante actualizado: ${contact.Name} (${erpCode})`);
+                    }
+
+                    results.push({
+                        studentName: contact.Name,
+                        erpCode: erpCode,
+                        success: true,
+                        action,
+                        message: `Estudiante ${action === 'created' ? 'creado' : 'actualizado'} exitosamente`,
+                    });
+                } catch (error) {
+                    this.logger.error(`Error sincronizando estudiante ${contact.Name}:`, error.message);
+                    results.push({
+                        studentName: contact.Name,
+                        erpCode: cardCode + '-' + contact.CntctCode,
+                        success: false,
+                        action: 'error',
+                        error: error.message,
+                    });
+                }
+            }
+
+            this.logger.log(`Sincronización de estudiantes completada para ${cardCode}. Total: ${results.length}`);
+            return results;
+        } catch (error) {
+            this.logger.error(`Error general sincronizando estudiantes para ${cardCode}:`, error.message);
+            return results;
         }
     }
 

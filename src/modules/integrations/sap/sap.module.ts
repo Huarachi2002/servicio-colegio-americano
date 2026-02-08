@@ -7,11 +7,12 @@ import { SapSyncService } from './services/sap-sync.service';
 import { SapSyncController } from './controllers/sap-sync.controller';
 import { MobileUser } from '../../../database/entities/mobile-user.entity';
 import { Father } from '../../../database/entities/father.entity';
+import { Student } from '../../../database/entities/student.entity';
 import { Employee } from '../../../database/entities/employee.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([MobileUser, Father, Employee]),
+        TypeOrmModule.forFeature([MobileUser, Father, Student, Employee]),
     ],
     controllers: [SapSyncController],
     providers: [
