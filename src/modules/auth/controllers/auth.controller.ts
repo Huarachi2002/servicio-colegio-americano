@@ -3,13 +3,17 @@ import { AuthService } from "../services/auth.service";
 import { LoginDto } from "../dto/login.dto";
 import { ApiResponseMovil } from "src/common/interfaces/api-response-movil.interface";
 import { ApiResponseWeb } from "src/common/interfaces/api-response-web.interface";
+import { CustomLoggerService } from "src/common/logger";
 
 @Controller()
 export class AuthController {
-    private readonly logger = new Logger(AuthController.name);
+    private readonly logger: CustomLoggerService;
     constructor(
-        private readonly authService: AuthService
-    ) { }
+        private readonly authService: AuthService,
+        private readonly customLogger: CustomLoggerService,
+    ) { 
+        this.logger = this.customLogger.setContext(AuthController.name);
+    }
 
     @Post('login')
     async login(@Body() loginDto: LoginDto, @Headers('device-token') deviceToken?: string): Promise<ApiResponseMovil> {
@@ -17,7 +21,7 @@ export class AuthController {
         try {
             // Intenta autenticas al usuario
             const user = await this.authService.attemptLogin(loginDto);
-
+            this.logger.log('Login attempt for username: ' + loginDto.username);
             if (!user) {
                 return {
                     status: 'error',
@@ -25,8 +29,8 @@ export class AuthController {
                     data: null
                 };
             }
-
             const data = await this.authService.sendLoginResponse(user, deviceToken);
+            this.logger.log('Login response prepared successfully for user: ' + user.username);
             return {
                 status: 'success',
                 message: 'Login successful',
@@ -36,6 +40,7 @@ export class AuthController {
             if (error instanceof HttpException) {
                 throw error;
             }
+            this.logger.error('Error during login process: ' + error.message);
 
             throw new HttpException(
                 'Autentication failed',
@@ -55,7 +60,7 @@ export class AuthController {
                 data: { apiToken }
             }
         } catch (error) {
-            this.logger.error('Credenciales Invalidas');
+            this.logger.error('Credenciales Invalidas: ' + error.message);
             return {
                 success: false,
                 message: error.message,

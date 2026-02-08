@@ -21,10 +21,10 @@ export class Device {
     tokenFcm: string;
 
     @Column({ nullable: true, name: 'entity_id' })
-    entityId: number;
+    entityId: number; // Puede ser el ID del padre, empleado o estudiante asociado a este dispositivo
 
     @Column({ nullable: true, name: 'entity_type' })
-    entityType: string;
+    entityType: string; // Puede ser 'Father', 'Employee' o 'Student' para identificar el tipo de entidad asociada
     
     // Relacion 1 a 1 con mobile user
     @OneToOne(() => MobileUser)

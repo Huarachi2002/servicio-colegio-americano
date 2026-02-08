@@ -42,9 +42,12 @@ export class AuthService {
         })
         const { username, password } = loginDto;
 
-        const user = await this.mobileUserRepository.findOneBy({
-            username,
-            state: EntityState.ENABLE
+        const user = await this.mobileUserRepository.findOne({
+            where: {
+                username,
+                state: EntityState.ENABLE
+            },
+            relations: ['device']
         });
 
         this.logger.log('User found: ' + user);
@@ -70,10 +73,10 @@ export class AuthService {
         })
 
 
-        // Actualizar dispositivo si se proporciona token
+        // Crear o actualizar dispositivo y vincularlo al usuario
         if (deviceToken) {
-            this.logger.log("Actualizando dispositivo");
-            await this.updateDevice(user, deviceToken);
+            this.logger.log("Procesando dispositivo");
+            await this.processUserDevice(user, deviceToken);
         }
 
         // Generar el token JWT
@@ -149,16 +152,51 @@ export class AuthService {
         return apiToken;
     }
 
-    private async updateDevice(
+    /**
+     * Procesa el dispositivo del usuario: crea si no existe, actualiza si existe,
+     * y vincula el dispositivo al usuario en la base de datos
+     */
+    private async processUserDevice(
         user: MobileUser,
         deviceToken: string,
     ): Promise<void> {
-        // Actualizar el dispositivo con el owner
-        await this.deviceService.updateDeviceToken(
-            user.device,
-            deviceToken,
-        );
-
+        try {
+            // Buscar si ya existe un dispositivo con este token en la BD
+            const existingDevice = await this.deviceService.findDeviceByToken(deviceToken);
+            
+            if (existingDevice) {
+                // Dispositivo existe: actualizar token FCM y owner
+                this.logger.log(`Dispositivo existente encontrado (ID: ${existingDevice.id}), actualizando...`);
+                await this.deviceService.updateDeviceOwnerAndToken(
+                    existingDevice,
+                    deviceToken,
+                    user.entity_type,
+                    user.entity_id
+                );
+                
+                // Vincular dispositivo al usuario si no está vinculado
+                if (!user.device || user.device.id !== existingDevice.id) {
+                    await this.deviceService.linkDeviceToUser(user.id, existingDevice.id);
+                    this.logger.log(`Dispositivo ${existingDevice.id} vinculado al usuario ${user.id}`);
+                }
+            } else {
+                // Dispositivo no existe: crear uno nuevo
+                this.logger.log('Dispositivo no encontrado, creando nuevo...');
+                const newDevice = await this.deviceService.createDevice({
+                    token: deviceToken,
+                    token_fcm: deviceToken,
+                    entity_id: user.entity_id,
+                    entity_type: user.entity_type,
+                });
+                
+                // Vincular el nuevo dispositivo al usuario
+                await this.deviceService.linkDeviceToUser(user.id, newDevice.id);
+                this.logger.log(`Nuevo dispositivo ${newDevice.id} creado y vinculado al usuario ${user.id}`);
+            }
+        } catch (error) {
+            this.logger.error(`Error procesando dispositivo: ${error.message}`);
+            throw error;
+        }
     }
 
     private generateToken(user: MobileUser): string {

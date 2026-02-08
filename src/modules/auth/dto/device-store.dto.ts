@@ -1,4 +1,4 @@
-import { IsString } from "class-validator";
+import { IsNumber, IsOptional, IsString } from "class-validator";
 
 export class DeviceStoreDto {
 
@@ -7,5 +7,13 @@ export class DeviceStoreDto {
 
     @IsString()
     token_fcm: string;
+
+    @IsNumber()
+    @IsOptional()
+    entity_id?: number;
+
+    @IsString()
+    @IsOptional()
+    entity_type?: string;
 
 }
