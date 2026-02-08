@@ -130,7 +130,7 @@ export class DeviceService {
     async linkDeviceToUser(userId: number, deviceId: number): Promise<void> {
         this.logger.log(`Vinculando dispositivo ${deviceId} al usuario ${userId}`);
         await this.deviceRepository.manager.query(
-            'UPDATE mobile_users SET device_id = ? WHERE id = ?',
+            'UPDATE mobile_users SET device_id = @0 WHERE id = @1',
             [deviceId, userId]
         );
     }
