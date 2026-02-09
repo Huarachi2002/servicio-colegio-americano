@@ -360,7 +360,7 @@ export class SapSyncService {
             for (const contact of contactPersons) {
                 try {
                     // El CntctCode se usa como erpCode del estudiante
-                    const erpCode = cardCode + '-' + contact.CntctCode;
+                    const erpCode = contact.CntctCode.toString();
                     
                     this.logger.log(`Procesando estudiante ${contact.Name} (ERP: ${erpCode})`);
 

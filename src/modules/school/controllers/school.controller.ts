@@ -141,7 +141,7 @@ export class SchoolController {
             return {
                 status: 'success',
                 message: 'Exchange rate retrieved',
-                data: rate,
+                data: rate.toString(),
             };
         } catch (error) {
             throw new HttpException(
