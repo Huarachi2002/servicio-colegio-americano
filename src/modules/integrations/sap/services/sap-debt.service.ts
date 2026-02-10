@@ -34,7 +34,7 @@ export class SapDebtService {
     async getDebtConsultation(
         studentErpCode: string,
     ): Promise<DebtConsultationResponse | null> {
-        try {            
+        try {
             this.logger.logIntegrationProcess('SAP Debt Consultation', 'START', 'START', { studentErpCode });
 
             // Ejecutar stored procedure SP_A_ConsultaDeudaLaravel
@@ -81,7 +81,7 @@ export class SapDebtService {
             this.logger.logIntegrationProcess('SAP Pending Debt Consultation', 'SUCCESS', 'SUCCESS', { result });
             return this.transformPendingDebtResponse(result);
         } catch (error) {
-            this.logger.error(`Error obteniendo deuda pendiente: ${error.message}`, error.stack );
+            this.logger.error(`Error obteniendo deuda pendiente: ${error.message}`, error.stack);
             return null;
         }
     }
@@ -218,17 +218,16 @@ export class SapDebtService {
         };
     }
 
-    /** Helper para calcular fecha de vencimiento desde periodo "M - AAAA" */
+    /** Helper para calcular fecha de vencimiento desde periodo "MM" */
     private calcularFechaVencimiento(periodoStr: string): string {
-        if (!periodoStr || !periodoStr.includes(' - ')) {
+        if (!periodoStr) {
             return '';
         }
 
-        const periodoMes = periodoStr.substring(0, periodoStr.indexOf(' '));
-        const periodoAnio = periodoStr.substring(periodoStr.indexOf('-') + 2);
-        const mes = periodoMes.padStart(2, '0'); // "1" -> "01"
+        const periodoMes = periodoStr
+        const periodoAnio = new Date().getFullYear()
 
-        return `${periodoAnio}-${mes}-15`;
+        return `${periodoAnio}-${periodoMes}-15`;
     }
 
     private transformPendingDebtResponse(
