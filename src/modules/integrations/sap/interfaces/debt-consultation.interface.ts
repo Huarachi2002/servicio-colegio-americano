@@ -154,14 +154,6 @@ export interface ListDebtDetail {
     MontoDeuda?: string | number;
 }
 
-/**
- * =====================================================
- * INTERFACES PARA SP_B_ConsultaDeudaFamiliar (Plan Familiar)
- * Respuesta de consulta de deudas agrupadas por familia
- * Estructura: PlanFamiliar → Estudiantes → Estudiante → ListaOrdenes → Orden → DetalleCuotas → Cuota
- * =====================================================
- */
-
 /** Datos crudos del XML de SP_B_ConsultaDeudaFamiliar */
 export interface ConsultaDeudaFamiliarXmlData {
     NombrePadre?: string;

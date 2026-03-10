@@ -310,6 +310,26 @@ export class SchoolController {
         }
     }
 
+    @Get('payment_plans/:erpCode')
+    async getPaymentPlans(
+        @Param('erpCode') erpCode: string,
+    ): Promise<ApiResponseMovil> {
+        try {
+            const paymentsPlans = await this.schoolService.getPaymentPlans(erpCode);
+
+            return {
+                status: 'success',
+                message: 'Payment plans retrieved',
+                data: paymentsPlans,
+            };
+        } catch (error) {
+            throw new HttpException(
+                'Error retrieving payment plans',
+                HttpStatus.INTERNAL_SERVER_ERROR,
+            );
+        }
+    }
+
     /**
      * GET /api/debt_state/:erpCode
      * Obtener estado de deuda (público)

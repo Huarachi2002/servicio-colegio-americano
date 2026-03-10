@@ -15,10 +15,18 @@ import {
     CuotaItem,
     EstudianteXmlData,
     OrdenXmlData,
-    CuotaXmlData,
+    CuotaXmlData as CuotaXmlDataFamily,
     StudentsDebtDetails,
 } from '../interfaces/debt-consultation.interface';
 import { CustomLoggerService } from 'src/common/logger';
+import { 
+    CuotaDetalle, 
+    CuotaDetalleXmlData, 
+    Cuotas, 
+    CuotaXmlData,
+    PaymentPlanResponse, 
+    PaymentPlanXmlData 
+} from '../interfaces/payment-plan.interface';
 
 @Injectable()
 export class SapDebtService {
@@ -59,6 +67,29 @@ export class SapDebtService {
             return this.getEmptyDebtResponse('Error al consultar deuda');
         }
     }
+
+    async getPaymentPlans(
+        erpCode: string,
+    ): Promise<PaymentPlanResponse | null> {
+        try {
+            this.logger.logIntegrationProcess('SAP Payment Plan Consultation', 'START', 'START', { erpCode });
+            const result = await this.sapService.executeStoredProcedure<PaymentPlanXmlData>(
+                'SP_ConsultaPlanPagos',
+                erpCode,
+            );
+
+            if (!result) {
+                this.logger.warn(`No hay planes de pago para ${erpCode}`);
+                return null;
+            }
+            this.logger.logIntegrationProcess('SAP Payment Plan Consultation', 'SUCCESS', 'SUCCESS', { result });
+            return this.transformPaymentPlanResponse(result);
+        } catch (error) {
+            this.logger.error(`Error obteniendo planes de pago: ${error.message}`, error.stack);
+            return null;
+        }
+    }
+
 
     async getPendingDebtConsultation(
         studentErpCode: string,
@@ -141,6 +172,58 @@ export class SapDebtService {
         };
     }
 
+    private transformPaymentPlanResponse(
+        xmlData: PaymentPlanXmlData
+    ): PaymentPlanResponse {
+        // Normalizar Cuotas: puede venir como objeto o array
+        const cuotasRaw = xmlData.Cuotas;
+        const cuotasArray: CuotaXmlData[] = Array.isArray(cuotasRaw)
+            ? cuotasRaw
+            : cuotasRaw
+                ? [cuotasRaw]
+                : [];
+
+        // Transformar cada cuota y sus detalles anidados
+        const cuotasResponse: Cuotas[] = cuotasArray.map(cuota => {
+            // Normalizar CuotaDetalle dentro de cada cuota
+            const detalleRaw = cuota.CuotaDetalle;
+            const detalleArray: CuotaDetalleXmlData[] = Array.isArray(detalleRaw)
+                ? detalleRaw
+                : detalleRaw
+                    ? [detalleRaw]
+                    : [];
+
+            // Transformar los detalles de esta cuota específica
+            const cuotaDetalleResponse: CuotaDetalle[] = detalleArray.map(detalle => ({
+                nombreEstudiante: String(detalle.NombreEstudiante || ''),
+                codigoEstudiante: String(detalle.CodigoEstudiante || ''),
+                idTransaccion: String(detalle.IdTransaccion || '0'),
+                linNum: String(detalle.LinNum || '0'),
+                conceptoDeuda: String(detalle.ConceptoDeuda || ''),
+                multaDeuda: String(detalle.MultaDeuda || '0'),
+                descuentoDeuda: String(detalle.DescuentoDeuda || '0'),
+                montoDeuda: String(detalle.MontoDeuda || '0'),
+            }));
+            const periodoStr = String(cuota.Periodo || '');
+            const fechaVencimiento = this.calcularFechaVencimiento(periodoStr);
+            return {
+                numeroCuota: String(cuota.NumeroCuota || ''),
+                periodo: periodoStr,
+                fechaVencimiento: fechaVencimiento,
+                montoCuota: String(cuota.MontoCuota || '0'),
+                cuotaDetalle: cuotaDetalleResponse,
+            };
+        });
+
+        return {
+            nombreDeudor: String(xmlData.NombreDeudor || ''),
+            razonSocial: String(xmlData.RazonSocial || ''),
+            nit: String(xmlData.Nit || ''),
+            moneda: String(xmlData.Moneda || 'BOB'),
+            cuotas: cuotasResponse
+        };
+    }
+
     private transformFamilyDebtResponse(
         xmlData: ConsultaDeudaFamiliarXmlData,
     ): FamilyPlanResponse {
@@ -169,7 +252,7 @@ export class SapDebtService {
             const ordenes: OrdenInfo[] = ordenesArray.map((orden) => {
                 // Normalizar DetalleCuotas: puede venir como objeto o array
                 const cuotasRaw = orden.DetalleCuotas?.Cuota;
-                const cuotasArray: CuotaXmlData[] = Array.isArray(cuotasRaw)
+                const cuotasArray: CuotaXmlDataFamily[] = Array.isArray(cuotasRaw)
                     ? cuotasRaw
                     : cuotasRaw
                         ? [cuotasRaw]

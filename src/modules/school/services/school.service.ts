@@ -10,6 +10,7 @@ import { SapDebtService } from '../../integrations/sap/services/sap-debt.service
 import { PaymentService } from './payment.service';
 import { SapService } from '../../integrations/sap/services/sap.service';
 import { CustomLoggerService } from 'src/common/logger';
+import { PaymentPlanResponse } from 'src/modules/integrations/sap/interfaces/payment-plan.interface';
 
 /**
  * SchoolService - Replica la lógica de SchoolApiService de Laravel
@@ -70,6 +71,11 @@ export class SchoolService {
             erpCode,
             debtInformation,
         );
+    }
+
+    async getPaymentPlans(erpCode: string): Promise<PaymentPlanResponse | null> {
+        this.logger.log(`Getting payment plans for: ${erpCode}`);
+        return await this.sapDebtService.getPaymentPlans(erpCode);
     }
 
     /**
