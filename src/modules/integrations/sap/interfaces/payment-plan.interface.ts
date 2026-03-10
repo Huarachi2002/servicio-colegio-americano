@@ -30,14 +30,18 @@ export interface PaymentPlanXmlData {
     RazonSocial?: string;
     Nit?: string;
     Moneda?: string;
-    Cuotas?: CuotaXmlData | CuotaXmlData[]; // Puede ser objeto o array
+    Cuotas?: {
+        CuotaXmlData?: CuotaXmlData | CuotaXmlData[]; // Contenedor con array de cuotas
+    };
 }
 
 export interface CuotaXmlData {
     NumeroCuota?: string;
     Periodo?: string;
     MontoCuota?: string;
-    CuotaDetalle?: CuotaDetalleXmlData | CuotaDetalleXmlData[]; // Puede ser objeto o array
+    CuotaDetalle?: {
+        CuotaDetalleXmlData?: CuotaDetalleXmlData | CuotaDetalleXmlData[]; // Contenedor con array de detalles
+    };
 }
 
 export interface CuotaDetalleXmlData {

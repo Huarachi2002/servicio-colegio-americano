@@ -175,8 +175,8 @@ export class SapDebtService {
     private transformPaymentPlanResponse(
         xmlData: PaymentPlanXmlData
     ): PaymentPlanResponse {
-        // Normalizar Cuotas: puede venir como objeto o array
-        const cuotasRaw = xmlData.Cuotas;
+        // Normalizar Cuotas: acceder al contenedor CuotaXmlData
+        const cuotasRaw = xmlData.Cuotas?.CuotaXmlData;
         const cuotasArray: CuotaXmlData[] = Array.isArray(cuotasRaw)
             ? cuotasRaw
             : cuotasRaw
@@ -185,8 +185,8 @@ export class SapDebtService {
 
         // Transformar cada cuota y sus detalles anidados
         const cuotasResponse: Cuotas[] = cuotasArray.map(cuota => {
-            // Normalizar CuotaDetalle dentro de cada cuota
-            const detalleRaw = cuota.CuotaDetalle;
+            // Normalizar CuotaDetalle: acceder al contenedor CuotaDetalleXmlData
+            const detalleRaw = cuota.CuotaDetalle?.CuotaDetalleXmlData;
             const detalleArray: CuotaDetalleXmlData[] = Array.isArray(detalleRaw)
                 ? detalleRaw
                 : detalleRaw
