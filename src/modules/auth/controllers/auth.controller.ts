@@ -1,8 +1,7 @@
 import { Body, Controller, Get, Headers, HttpException, HttpStatus, Logger, Post } from "@nestjs/common";
 import { AuthService } from "../services/auth.service";
 import { LoginDto } from "../dto/login.dto";
-import { ApiResponseMovil } from "src/common/interfaces/api-response.interface";
-import { ApiResponseWeb } from "src/common/interfaces/api-response-web.interface";
+import { ApiResponse } from "src/common/interfaces/api-response.interface";
 import { CustomLoggerService } from "src/common/logger";
 
 @Controller()
@@ -16,7 +15,7 @@ export class AuthController {
     }
 
     @Post('login')
-    async login(@Body() loginDto: LoginDto, @Headers('device-token') deviceToken?: string): Promise<ApiResponseMovil> {
+    async login(@Body() loginDto: LoginDto, @Headers('device-token') deviceToken?: string): Promise<ApiResponse> {
 
         try {
             // Intenta autenticas al usuario
@@ -50,19 +49,19 @@ export class AuthController {
     }
 
     @Post('login-web')
-    async loginWeb(@Body() loginDto: LoginDto): Promise<ApiResponseWeb<any>> {
+    async loginWeb(@Body() loginDto: LoginDto): Promise<ApiResponse> {
         this.logger.log('Received web login request for username: ' + loginDto.username);
         try {
             const apiToken = await this.authService.loginWeb(loginDto);
             return {
-                success: true,
+                status: 'success',
                 message: 'Login successful',
                 data: { apiToken }
             }
         } catch (error) {
             this.logger.error('Credenciales Invalidas: ' + error.message);
             return {
-                success: false,
+                status: 'error',
                 message: error.message,
                 data: null
             };
