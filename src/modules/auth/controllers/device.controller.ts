@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Headers, HttpException, HttpStatus, Post } from "@nestjs/common";
 import { DeviceService } from "../services/device.service";
 import { DeviceStoreDto } from "../dto/device-store.dto";
-import { ApiResponseMovil } from "src/common/interfaces/api-response.interface";
+import { ApiResponse } from "src/common/interfaces/api-response.interface";
 import { DeviceUpdateDto } from "../dto/device-update.dto";
 
 @Controller()
@@ -9,7 +9,7 @@ export class DeviceController {
     constructor(private readonly deviceService: DeviceService) { }
 
     @Post('device')
-    async store(@Body() deviceDto: DeviceStoreDto): Promise<ApiResponseMovil> {
+    async store(@Body() deviceDto: DeviceStoreDto): Promise<ApiResponse> {
 
         try {
             const newDevice = await this.deviceService.storeDevice(deviceDto);
@@ -32,7 +32,7 @@ export class DeviceController {
     }
 
     @Post('update_device_token')
-    async update(@Body() deviceDto: DeviceUpdateDto): Promise<ApiResponseMovil> {
+    async update(@Body() deviceDto: DeviceUpdateDto): Promise<ApiResponse> {
 
         try {
             const updatedDevice = await this.deviceService.updateModel(deviceDto);
