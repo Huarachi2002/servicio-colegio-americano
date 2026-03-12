@@ -9,6 +9,7 @@ import { Payment } from '../../database/entities/payment.entity';
 import { ExternalApiController } from './controllers/external-api.controller';
 import { ExternalApiService } from './services/external-api.service';
 import { BnbService } from './services/bnb.service';
+import { BgService } from './services/bg.service';
 import { ApiKeyStrategy } from './strategies/api-key.strategy';
 import { SapModule } from '../integrations/sap/sap.module';
 import { ConnectorModule } from '../integrations/connector/connector.module';
@@ -33,11 +34,13 @@ import { ConnectorModule } from '../integrations/connector/connector.module';
     providers: [
         ExternalApiService,
         BnbService,
+        BgService,
         ApiKeyStrategy,
     ],
     exports: [
         ExternalApiService,
         BnbService,
+        BgService,
     ],
 })
 export class ExternalApiModule { }
