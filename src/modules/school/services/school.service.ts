@@ -11,6 +11,7 @@ import { PaymentService } from './payment.service';
 import { SapService } from '../../integrations/sap/services/sap.service';
 import { CustomLoggerService } from 'src/common/logger';
 import { PaymentPlanResponse } from 'src/modules/integrations/sap/interfaces/payment-plan.interface';
+import { GenerateQrDto } from '../dto/generate-qr.dto';
 
 /**
  * SchoolService - Replica la lógica de SchoolApiService de Laravel
@@ -60,22 +61,17 @@ export class SchoolService {
 
     /**
      * Guardar información de pago y generar QR
-     * Replica: SchoolApiService::savePaymentInformation()
      */
     async savePaymentInformation(
-        erpCode: string,
-        debtInformation: any,
+        dataPayment: GenerateQrDto 
     ): Promise<string | null> {
-        this.logger.log(`Saving payment information for: ${erpCode}`);
-        return await this.paymentService.savePaymentInformation(
-            erpCode,
-            debtInformation,
-        );
+        this.logger.log(`Saving payment information for: ${dataPayment.erp_code}`);
+        return await this.paymentService.savePaymentInformation(dataPayment);
     }
 
-    async getPaymentPlans(erpCode: string): Promise<PaymentPlanResponse | null> {
+    async getPlanPayments(erpCode: string): Promise<PaymentPlanResponse | null> {
         this.logger.log(`Getting payment plans for: ${erpCode}`);
-        return await this.sapDebtService.getPaymentPlans(erpCode);
+        return await this.sapDebtService.getPlanPayments(erpCode);
     }
 
     /**

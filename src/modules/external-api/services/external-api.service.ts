@@ -18,6 +18,7 @@ import { ConfigService } from '@nestjs/config';
 import { CustomLoggerService } from 'src/common/logger';
 import { PaymentNotificationRequest } from 'src/modules/integrations/connector/interfaces/connector.interface';
 import { ConnectorService } from 'src/modules/integrations/connector/services/connector.service';
+import { PaymentPlanResponse } from 'src/modules/integrations/sap/interfaces/payment-plan.interface';
 
 /**
  * Servicio para la API externa (bancos y servicios externos)
@@ -148,6 +149,36 @@ export class ExternalApiService {
             this.logger.error(`Error obteniendo deudas: ${error.message}`, error.stack);
             this.logger.logIntegrationProcess('SAP_DEBT', 'getStudentDebts', 'ERROR', {
                 studentCode,
+                error: error.message,
+            });
+            throw error;
+        }
+    }
+
+    async getPlanPayments(parentCode: string): Promise<PaymentPlanResponse | null> {
+        try {
+            this.logger.log(`Obteniendo planes de pago para padre: ${parentCode}`);
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getPlanPayments', 'START', { parentCode });
+
+            const planData = await this.sapDebtService.getPlanPayments(parentCode);
+
+            if (!planData) {
+                this.logger.logIntegrationProcess('SAP_DEBT', 'getPlanPayments', 'SUCCESS', {
+                    parentCode,
+                    hasDebts: false,
+                });
+                return null;
+            }
+
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getPlanPayments', 'SUCCESS', {
+                parentCode,
+                hasDebts: true,
+            });
+            return planData;
+        } catch (error) {
+            this.logger.error(`Error obteniendo deudas: ${error.message}`, error.stack);
+            this.logger.logIntegrationProcess('SAP_DEBT', 'getPlanPayments', 'ERROR', {
+                parentCode,
                 error: error.message,
             });
             throw error;

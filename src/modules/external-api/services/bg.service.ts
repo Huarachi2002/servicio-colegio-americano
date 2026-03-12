@@ -3,6 +3,8 @@ import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { lastValueFrom } from "rxjs";
 import { CustomLoggerService } from "src/common/logger";
+import { PayloadQrInterface } from "../interfaces/payload-qr.interface";
+import { QrResponseInterface } from "../interfaces/qr-response.interface";
 
 
 @Injectable()
@@ -69,21 +71,18 @@ export class BgService {
     }
 
     async generateQR(
-        amount: number | string,
-        gloss: string,
-        currency: string = 'BOB',
-        expirationDate: string,
-    ): Promise<any> {
+        payloadQr: PayloadQrInterface
+    ): Promise<QrResponseInterface> {
 
         this.logger.log('Generando QR en BG');
         if (!this.token) {
             await this.authenticate();
         }
 
-        const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+        const numericAmount = typeof payloadQr.amount === 'string' ? parseFloat(payloadQr.amount) : payloadQr.amount;
 
         if (isNaN(numericAmount) || numericAmount <= 0) {
-            this.logger.error(`Amount inválido para generación de QR en BG: ${amount}`);
+            this.logger.error(`Amount inválido para generación de QR en BG: ${payloadQr.amount}`);
             throw new HttpException(
                 'El monto debe ser un número mayor a 0',
                 HttpStatus.BAD_REQUEST
@@ -99,9 +98,9 @@ export class BgService {
             const body = {
                 'accountReference': this.configService.get('BG_ACCOUNT_ID'),
                 'amount': numericAmount,
-                'currency': currency,
-                'gloss': gloss,
-                'expirationDate': expirationDate,
+                'currency': 'BOB',
+                'gloss': payloadQr.gloss,
+                'expirationDate': payloadQr.expirationDate,
                 'sigleUse': 1,
                 'userName': this.configService.get('BG_API_USER'),
                 'apiKey': this.configService.get('BG_API_KEY'),
@@ -117,7 +116,12 @@ export class BgService {
             this.logger.debug('Respuesta BNB: ', response.data);
 
             if (response.data && response.data.qrImage) {
-                return response.data;
+                return {
+                    qrId: response.data.qrId,
+                    qrImage: response.data.qrImage,
+                    success: true,
+                    message: response.data.message
+                }
             } else {
                 this.logger.error('BNB respondió sin éxito:', response.data);
                 throw new HttpException(

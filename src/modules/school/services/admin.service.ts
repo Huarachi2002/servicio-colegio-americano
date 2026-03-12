@@ -16,6 +16,8 @@ import { PaymentNotification } from "src/database/entities/payment-notification.
 import { ExchangeRate } from "src/database/entities/exchange-rate.entity";
 import { CustomLoggerService } from "src/common/logger";
 import { Rol } from "src/database/entities/roles.entity";
+import { GenerateQrDto } from "../dto/generate-qr.dto";
+import { PaymentService } from "./payment.service";
 
 
 @Injectable()
@@ -26,7 +28,7 @@ export class AdminService {
         @InjectRepository(ApiClient)
         private readonly apiClientRepository: Repository<ApiClient>,
         @InjectRepository(User)
-        private readonly userRepository: Repository<User>,  
+        private readonly userRepository: Repository<User>,
         @InjectRepository(MobileUser)
         private readonly mobileUserRepository: Repository<MobileUser>,
         @InjectRepository(PaymentNotification)
@@ -36,7 +38,8 @@ export class AdminService {
         @InjectRepository(Rol)
         private readonly rolRepository: Repository<Rol>,
         private readonly customLogger: CustomLoggerService,
-    ) { 
+        private readonly paymentService: PaymentService,
+    ) {
         this.logger = this.customLogger.setContext(AdminService.name);
     }
 
@@ -73,7 +76,7 @@ export class AdminService {
         const existingUser = await this.userRepository.findOne({ where: { id: userId } });
         if (!existingUser) {
             throw new NotFoundException(`Usuario con ID '${userId}' no encontrado.`);
-        }   
+        }
         this.logger.log(`Usuario con ID '${userId}' encontrado, procediendo a actualizar.`);
         Object.assign(existingUser, userData);
         if (userData.roleId) {
@@ -114,7 +117,7 @@ export class AdminService {
         const existingUser = await this.mobileUserRepository.findOne({ where: { id: userId } });
         if (!existingUser) {
             throw new NotFoundException(`Usuario movil con ID '${userId}' no encontrado.`);
-        }   
+        }
         this.logger.log(`Usuario movil con ID '${userId}' encontrado, procediendo a actualizar.`);
         Object.assign(existingUser, userData);
         return await this.mobileUserRepository.save(existingUser);
@@ -141,7 +144,7 @@ export class AdminService {
         // Generar API Key y su hash
         const { plainApiKey, hashedApiKey } = this.generateApiKeyWithHash();
         this.logger.log(`API Key generada para nuevo cliente API: ${apiClient.name}`);
-        
+
         const dataCliente = {
             name: apiClient.name,
             apiSecret: hashedApiKey,
@@ -158,7 +161,7 @@ export class AdminService {
         return Object.assign(savedClient, { plainApiKey });
     }
 
-    async updateApiClient(id:number, apiClient: UpdateApiClient): Promise<ApiClient> {
+    async updateApiClient(id: number, apiClient: UpdateApiClient): Promise<ApiClient> {
         this.logger.log(`Actualizando cliente API: ${apiClient.name}`);
         const existingClient = await this.apiClientRepository.findOne({ where: { id } });
         if (!existingClient) {
@@ -167,7 +170,7 @@ export class AdminService {
         this.logger.log(`Cliente API con ID '${id}' encontrado, procediendo a actualizar.`);
         Object.assign(existingClient, apiClient);
         return await this.apiClientRepository.save(existingClient);
-    }   
+    }
 
     async getPaymentNotifications(): Promise<PaymentNotification[]> {
         this.logger.log('Obteniendo lista de notificaciones de pago');
@@ -223,6 +226,11 @@ export class AdminService {
         const hashedApiKey = crypto.createHash('sha256').update(plainApiKey).digest('hex');
         this.logger.log('API Key generada y hasheada exitosamente');
         return { plainApiKey, hashedApiKey };
+    }
+
+    async savePaymentInformation(dataPayment: GenerateQrDto): Promise<string | null> {
+        this.logger.log(`Saving payment information for: ${dataPayment.erp_code}`);
+        return await this.paymentService.savePaymentInformation(dataPayment);
     }
 
     /**

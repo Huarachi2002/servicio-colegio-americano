@@ -3,6 +3,8 @@ import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { lastValueFrom } from "rxjs";
 import { CustomLoggerService } from "src/common/logger";
+import { PayloadQrInterface } from "../interfaces/payload-qr.interface";
+import { QrResponseInterface } from "../interfaces/qr-response.interface";
 
 
 @Injectable()
@@ -102,51 +104,44 @@ export class BnbService {
         }
     }
 
-    async generateQR(
-        additionalData: any,
-        amount: number | string,
-        gloss: string,
-        currency: string = 'BOB',
-        expirationDate: string
-    ): Promise<any> {
+    async generateQR(payloadQr: PayloadQrInterface): Promise<QrResponseInterface> {
         // Siempre autenticar antes de generar QR para asegurar token válido
         this.logger.log('Autenticando antes de generar QR...');
         await this.authenticate();
 
         // Asegurar que amount sea numérico
-        const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-        
+        const numericAmount = typeof payloadQr.amount === 'string' ? parseFloat(payloadQr.amount) : payloadQr.amount;
+
         if (isNaN(numericAmount) || numericAmount <= 0) {
-            this.logger.error(`Monto inválido: ${amount}`);
+            this.logger.error(`Monto inválido: ${payloadQr.amount}`);
             this.logger.logIntegrationProcess('BNB_QR', 'generateQR', 'ERROR', {
                 error: 'Monto inválido',
-                amount,
+                amount: payloadQr.amount,
             });
             throw new HttpException(
                 'El monto debe ser un número mayor a 0',
                 HttpStatus.BAD_REQUEST
             );
         }
-
         const url = `${this.configService.get('BNB_API_URL')}/QRSimple.API/api/v1/main/getQRWithImageAsync`;
         const body = {
-            currency,
-            gloss,
+            currency: 'BOB',
+            gloss: payloadQr.gloss,
             amount: numericAmount,
             singleUse: true,
-            expirationDate,
-            additionalData: JSON.stringify(additionalData),
-            destinationAccountId: currency === 'USD' ? 2 : 1,
+            expirationDate: payloadQr.expirationDate,
+            additionalData: JSON.stringify(payloadQr.additionalData),
+            destinationAccountId: 1,
         };
         const startTime = Date.now();
 
         try {
             this.logger.logIntegrationProcess('BNB_QR', 'generateQR', 'START', {
                 url,
-                currency,
+                currency: 'BOB',
                 amount: numericAmount,
-                gloss,
-                expirationDate,
+                gloss: payloadQr.gloss,
+                expirationDate: payloadQr.expirationDate,
             });
 
             this.logger.log('Generando QR con datos: ' + JSON.stringify(body));
@@ -174,7 +169,12 @@ export class BnbService {
                     qrId: response.data.id,
                     duration: `${duration}ms`,
                 });
-                return response.data;
+                return {
+                    qrId: response.data.id,
+                    qrImage: response.data.qr,
+                    success: response.data.success,
+                    message: response.data.message
+                };
             } else {
                 this.logger.logIntegrationProcess('BNB_QR', 'generateQR', 'ERROR', {
                     response: response.data,

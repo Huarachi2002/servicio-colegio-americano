@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Headers, HttpException, HttpStatus, Post } from "@nestjs/common";
 import { DeviceService } from "../services/device.service";
 import { DeviceStoreDto } from "../dto/device-store.dto";
-import { ApiResponseMovil } from "src/common/interfaces/api-response-movil.interface";
+import { ApiResponseMovil } from "src/common/interfaces/api-response.interface";
 import { DeviceUpdateDto } from "../dto/device-update.dto";
 
 @Controller()

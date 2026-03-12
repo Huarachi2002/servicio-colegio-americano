@@ -68,7 +68,7 @@ export class SapDebtService {
         }
     }
 
-    async getPaymentPlans(
+    async getPlanPayments(
         erpCode: string,
     ): Promise<PaymentPlanResponse | null> {
         try {

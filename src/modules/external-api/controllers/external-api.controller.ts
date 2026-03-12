@@ -101,6 +101,27 @@ export class ExternalApiController {
         }
     }
 
+    @Get('payment_plans/:parentDocument')
+    async getPlanPayments(
+        @Param('parentDocument') parentDocument: string,
+        @CurrentApiClient() client: ApiClient,
+    ): Promise<ExternalApiResponse<any>> {
+        const requestId = this.externalApiService.generateRequestId();
+        this.logger.log(`[${requestId}] ${client.name} - Obteniendo planes de pago: ${parentDocument}`);
+
+        try {
+            const plan_payments = await this.externalApiService.getPlanPayments(parentDocument);
+
+            if (!plan_payments) {
+                return this.createResponse(requestId, true, 'NOT_FOUND', 'No hay deudas pendientes', []);
+            }
+
+            return this.createResponse(requestId, true, 'OK', 'Deudas encontradas', plan_payments);
+        } catch (error) {
+            this.logger.error(`[${requestId}] Error: ${error.message}`);
+            return this.createResponse(requestId, false, 'ERROR', 'Error interno', null);
+        }
+    }
 
     @Get('students/:studentCode/debts/priority')
     async getPriorityDebt(

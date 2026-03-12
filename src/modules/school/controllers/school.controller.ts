@@ -12,7 +12,7 @@ import { SchoolService } from '../services/school.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { MobileUser } from '../../../database/entities/mobile-user.entity';
-import { ApiResponseMovil } from '../../../common/interfaces/api-response-movil.interface';
+import { ApiResponse } from '../../../common/interfaces/api-response.interface';
 import { StudentCodeDto } from '../../integrations/sap/dto/student-code.dto';
 import { GenerateQrDto } from '../dto/generate-qr.dto';
 import { ConfigService } from '@nestjs/config';
@@ -37,7 +37,7 @@ export class SchoolController {
     @UseGuards(JwtAuthGuard)
     async debtConsultation(
         @Body() dto: StudentCodeDto,
-    ): Promise<ApiResponseMovil> {
+    ): Promise<ApiResponse> {
         try {
             const debtInfo = await this.schoolService.getDebtConsultation(
                 dto.studentErpCode,
@@ -64,7 +64,7 @@ export class SchoolController {
     @UseGuards(JwtAuthGuard)
     async pendingDebtConsultation(
         @Body() dto: StudentCodeDto,
-    ): Promise<ApiResponseMovil> {
+    ): Promise<ApiResponse> {
         try {
             const debtInfo =
                 await this.schoolService.getPendingDebtConsultation(
@@ -92,12 +92,9 @@ export class SchoolController {
      */
     @Post('generate_qr')
     @UseGuards(JwtAuthGuard)
-    async generateQr(@Body() dto: GenerateQrDto): Promise<ApiResponseMovil> {
+    async generateQr(@Body() dto: GenerateQrDto): Promise<ApiResponse> {
         try {
-            const qrCode = await this.schoolService.savePaymentInformation(
-                dto.erp_code,
-                dto.debt_information,
-            );
+            const qrCode = await this.schoolService.savePaymentInformation(dto);
 
             if (!qrCode) {
                 return {
@@ -113,10 +110,21 @@ export class SchoolController {
                 data: qrCode,
             };
         } catch (error) {
-            throw new HttpException(
-                'Error generating QR code',
-                HttpStatus.INTERNAL_SERVER_ERROR,
-            );
+            let errorMessage = 'Error al generar el código QR en este momento, intente nuevamente.';
+
+            if (error instanceof HttpException) {
+                if (error.getStatus() === HttpStatus.BAD_GATEWAY) {
+                    errorMessage = 'El servicio del banco presenta intermitencias. Por favor, intenta generar tu código en unos minutos.';
+                } else if (error.getStatus() === HttpStatus.BAD_REQUEST) {
+                    errorMessage = error.message;
+                }
+            }
+
+            return {
+                status: 'error',
+                message: errorMessage,
+                data: null,
+            };
         }
     }
 
@@ -126,7 +134,7 @@ export class SchoolController {
      */
     @Get('exchange_rate')
     @UseGuards(JwtAuthGuard)
-    async getExchangeRate(): Promise<ApiResponseMovil> {
+    async getExchangeRate(): Promise<ApiResponse> {
         try {
             const rate = await this.schoolService.getExchangeRate();
 
@@ -159,7 +167,7 @@ export class SchoolController {
     @UseGuards(JwtAuthGuard)
     async getStudents(
         @CurrentUser() user: MobileUser,
-    ): Promise<ApiResponseMovil> {
+    ): Promise<ApiResponse> {
         try {
             const students = await this.schoolService.getStudentsByFatherId(
                 user.entity_id,
@@ -210,7 +218,7 @@ export class SchoolController {
      */
     @Post('grades')
     @UseGuards(JwtAuthGuard)
-    async getGrades(): Promise<ApiResponseMovil> {
+    async getGrades(): Promise<ApiResponse> {
         try {
             const grades = await this.schoolService.getGrades();
 
@@ -241,7 +249,7 @@ export class SchoolController {
      */
     @Post('parallels')
     @UseGuards(JwtAuthGuard)
-    async getParallels(): Promise<ApiResponseMovil> {
+    async getParallels(): Promise<ApiResponse> {
         try {
             const parallels = await this.schoolService.getParallels();
 
@@ -266,7 +274,7 @@ export class SchoolController {
     @UseGuards(JwtAuthGuard)
     async getAnnotations(
         @Body() dto: StudentCodeDto,
-    ): Promise<ApiResponseMovil> {
+    ): Promise<ApiResponse> {
         try {
             const data = await this.schoolService.getAnnotationsAndAbsences(
                 dto.studentErpCode,
@@ -291,7 +299,7 @@ export class SchoolController {
      */
     @Get('father/:id')
     @UseGuards(JwtAuthGuard)
-    async getFather(@Param('id') id: string): Promise<ApiResponseMovil> {
+    async getFather(@Param('id') id: string): Promise<ApiResponse> {
         try {
             const erpCode = await this.schoolService.getFatherById(
                 parseInt(id),
@@ -311,11 +319,11 @@ export class SchoolController {
     }
 
     @Get('payment_plans/:erpCode')
-    async getPaymentPlans(
+    async getPlanPayments(
         @Param('erpCode') erpCode: string,
-    ): Promise<ApiResponseMovil> {
+    ): Promise<ApiResponse> {
         try {
-            const paymentsPlans = await this.schoolService.getPaymentPlans(erpCode);
+            const paymentsPlans = await this.schoolService.getPlanPayments(erpCode);
 
             return {
                 status: 'success',
@@ -337,7 +345,7 @@ export class SchoolController {
     @Get('debt_state/:erpCode')
     async getDebtState(
         @Param('erpCode') erpCode: string,
-    ): Promise<ApiResponseMovil> {
+    ): Promise<ApiResponse> {
         try {
             const debtState = await this.schoolService.getDebtState(erpCode);
 
@@ -376,7 +384,7 @@ export class SchoolController {
      * Obtener última versión de la app (público)
      */
     @Get('app_last_version')
-    async getAppLastVersion(): Promise<ApiResponseMovil> {
+    async getAppLastVersion(): Promise<ApiResponse> {
         return {
             status: 'success',
             message: 'App versions retrieved',
@@ -392,7 +400,7 @@ export class SchoolController {
      * Obtener URL de noticias (público)
      */
     @Get('news_url')
-    async getNewsUrl(): Promise<ApiResponseMovil> {
+    async getNewsUrl(): Promise<ApiResponse> {
         return {
             status: 'success',
             message: 'News URL retrieved',

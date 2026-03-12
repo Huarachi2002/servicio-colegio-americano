@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsObject } from 'class-validator';
+import { IsString, IsNotEmpty, IsObject, IsOptional } from 'class-validator';
+import { PaymentInformationDto } from './payment-information.dto';
 
 export class GenerateQrDto {
     @IsString()
@@ -7,5 +8,9 @@ export class GenerateQrDto {
 
     @IsObject()
     @IsNotEmpty()
-    debt_information: any; // DebtConsultationResponse object
+    payment_information: PaymentInformationDto;
+
+    @IsString()
+    @IsOptional()
+    bank_name?: string = 'BG';
 }

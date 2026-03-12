@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Headers, HttpException, HttpStatus, Logger, Post } from "@nestjs/common";
 import { AuthService } from "../services/auth.service";
 import { LoginDto } from "../dto/login.dto";
-import { ApiResponseMovil } from "src/common/interfaces/api-response-movil.interface";
+import { ApiResponseMovil } from "src/common/interfaces/api-response.interface";
 import { ApiResponseWeb } from "src/common/interfaces/api-response-web.interface";
 import { CustomLoggerService } from "src/common/logger";
 
@@ -11,7 +11,7 @@ export class AuthController {
     constructor(
         private readonly authService: AuthService,
         private readonly customLogger: CustomLoggerService,
-    ) { 
+    ) {
         this.logger = this.customLogger.setContext(AuthController.name);
     }
 
