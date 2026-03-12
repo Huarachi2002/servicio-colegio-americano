@@ -101,7 +101,7 @@ export class ExternalApiController {
         }
     }
 
-    @Get('payment_plans/:parentDocument')
+    @Get('payments_plan/:parentDocument')
     async getPlanPayments(
         @Param('parentDocument') parentDocument: string,
         @CurrentApiClient() client: ApiClient,
