@@ -16,7 +16,7 @@ export class BgService {
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
         private readonly customLogger: CustomLoggerService,
-    ) { 
+    ) {
         this.logger = this.customLogger.setContext(BgService.name);
     }
 
@@ -79,8 +79,8 @@ export class BgService {
             await this.authenticate();
         }
 
-        const numericAmount = typeof payloadQr.amount === 'string' ? parseFloat(payloadQr.amount) : payloadQr.amount;
-
+        const rawAmount = typeof payloadQr.amount === 'string' ? parseFloat(payloadQr.amount) : payloadQr.amount;
+        const numericAmount = Number(rawAmount.toFixed(2))
         if (isNaN(numericAmount) || numericAmount <= 0) {
             this.logger.error(`Amount inválido para generación de QR en BG: ${payloadQr.amount}`);
             throw new HttpException(
@@ -106,7 +106,6 @@ export class BgService {
                 'apiKey': this.configService.get('BG_API_KEY'),
             }
 
-            // this.logger.log('Generando QR con datos: ', body);
             this.logger.log(`Generando QR con datos: ${body}`);
             this.logger.log(`URL: ${url}`);
             this.logger.log(`Headers: ${JSON.stringify(headers)}`);

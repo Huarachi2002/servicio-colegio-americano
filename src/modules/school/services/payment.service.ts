@@ -56,7 +56,7 @@ export class PaymentService {
             // Concatenar IDs de transacción y el LinNum para generar un transactionId único 
             transactionId = payment_information.students
                 .flatMap(s => s.orderLines)
-                .map(ol => `${ol.idTransaccion}-${ol.lineNum}`)
+                .map(ol => `${ol.orderDocEntry}-${ol.lineNum}`)
                 .sort()
                 .join('|');
 

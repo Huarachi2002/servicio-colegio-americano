@@ -69,7 +69,7 @@ export class BnbService {
         } catch (error) {
             const duration = Date.now() - startTime;
             this.logger.error('Error autenticando con BNB');
-            
+
             if (error.response) {
                 this.logger.logApiCall(
                     'BNB',
@@ -96,7 +96,7 @@ export class BnbService {
                 error: error.message,
                 duration: `${duration}ms`,
             });
-            
+
             throw new HttpException(
                 `Error de comunicación bancaria: ${error.message}`,
                 HttpStatus.BAD_GATEWAY
@@ -109,8 +109,8 @@ export class BnbService {
         this.logger.log('Autenticando antes de generar QR...');
         await this.authenticate();
 
-        // Asegurar que amount sea numérico
-        const numericAmount = typeof payloadQr.amount === 'string' ? parseFloat(payloadQr.amount) : payloadQr.amount;
+        const rawAmount = typeof payloadQr.amount === 'string' ? parseFloat(payloadQr.amount) : payloadQr.amount;
+        const numericAmount = Number(rawAmount.toFixed(2));
 
         if (isNaN(numericAmount) || numericAmount <= 0) {
             this.logger.error(`Monto inválido: ${payloadQr.amount}`);
@@ -189,7 +189,7 @@ export class BnbService {
         } catch (error) {
             const duration = Date.now() - startTime;
             this.logger.error('Error generando QR');
-            
+
             // Log detallado del error
             if (error.response) {
                 this.logger.logApiCall(
@@ -204,7 +204,7 @@ export class BnbService {
                 );
                 this.logger.error(`Status: ${error.response.status}`);
                 this.logger.error(`Data: ${JSON.stringify(error.response.data)}`);
-                
+
                 // Si es error 401, el token no es válido
                 if (error.response.status === 401) {
                     this.logger.error('Error 401: Token de BNB no válido o expirado');
@@ -230,12 +230,12 @@ export class BnbService {
                 error: error.message,
                 duration: `${duration}ms`,
             });
-            
+
             // Si ya es HttpException, relanzarla
             if (error instanceof HttpException) {
                 throw error;
             }
-            
+
             throw new HttpException(
                 `No se pudo generar el QR bancario: ${error.message}`,
                 HttpStatus.BAD_GATEWAY

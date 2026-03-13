@@ -33,7 +33,7 @@ export class StudentPaymentInfo {
 
 export class OrderLineInfo {
     @IsString()
-    idTransaccion: string;
+    orderDocEntry: string;
 
     @IsString()
     lineNum: string;
