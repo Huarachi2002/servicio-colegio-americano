@@ -179,8 +179,7 @@ export class PaymentService {
             this.logger.logPaymentTransaction(transactionId, 'generateAdditionalData', 'PROCESSING');
 
             const additionalData = {
-                transactionId: transactionId,
-                data: JSON.stringify(payment_information)
+                transactionId: transactionId
             };
 
             this.logger.logPaymentTransaction(transactionId, 'generateQR', 'PROCESSING', {
