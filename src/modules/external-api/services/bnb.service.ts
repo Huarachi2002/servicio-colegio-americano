@@ -127,7 +127,7 @@ export class BnbService {
         const body = {
             currency: 'BOB',
             gloss: payloadQr.gloss,
-            amount: numericAmount,
+            amount: parseFloat(numericAmount.toFixed(2)), // Siempre 2 decimales para BNB
             singleUse: true,
             expirationDate: payloadQr.expirationDate,
             additionalData: JSON.stringify(payloadQr.additionalData),
