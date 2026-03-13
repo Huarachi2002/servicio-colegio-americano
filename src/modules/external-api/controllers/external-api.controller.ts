@@ -6,8 +6,6 @@ import {
     Param,
     Query,
     UseGuards,
-    HttpException,
-    HttpStatus,
     Logger,
 } from '@nestjs/common';
 import { ApiKeyAuthGuard } from '../../../common/guards/api-key-auth.guard';
@@ -16,8 +14,7 @@ import { ApiClient } from '../../../database/entities/api-client.entity';
 import { ExternalApiService } from '../services/external-api.service';
 import { PaymentNotificationDto } from '../dto/payment-notification.dto';
 import { ExternalApiResponse } from '../interfaces/external-api-response.interface';
-import { BnbService } from '../services/bnb.service';
-import { ConfigService } from '@nestjs/config';
+import { ReceiveNotificationBnbDto } from '../dto/receive-notificaction-bnb.dto';
 
 @Controller('external')
 @UseGuards(ApiKeyAuthGuard)
@@ -26,8 +23,6 @@ export class ExternalApiController {
 
     constructor(
         private readonly externalApiService: ExternalApiService,
-        private readonly bnbService: BnbService,
-        private readonly configService: ConfigService,
     ) { }
 
     @Get('debtors')
@@ -281,49 +276,40 @@ export class ExternalApiController {
         });
     }
 
-    /**
-     * GET /api/external/bnb/test
-     */
-    @Get('bnb/test')
-    async testBnbConnection(): Promise<any> {
+    @Post('ReceiveNotification')
+    async receiveNotification(
+        @Body() dto: ReceiveNotificationBnbDto,
+        @CurrentApiClient() client: ApiClient,
+    ): Promise<any> {
         const requestId = this.externalApiService.generateRequestId();
-        this.logger.log(`[${requestId}] Testing BNB connection...`);
-
         try {
-            // Información de configuración (sin exponer credenciales completas)
-            const config = {
-                url: this.configService.get('BNB_API_URL'),
-                accountId: this.configService.get('BNB_ACCOUNT_ID')?.substring(0, 10) + '...',
-                authIdConfigured: !!this.configService.get('BNB_AUTH_ID'),
-            };
+            this.logger.log(`[${requestId}] Recibiendo notificación de pago: ${dto.QRId}`);
+            const dataPayment = await this.externalApiService.getPaymentInformationByQr(dto.QRId);
+            if (!dataPayment) {
+                return {
+                    success: false,
+                    message: "No se encontro el pago"
+                }
+            }
+            let totalAmount = 0;
+            dataPayment.students.forEach(student => {
+                totalAmount += student.orderLines.reduce((total, orderLine) => total + orderLine.amount, 0);
+            });
 
-            this.logger.log(`[${requestId}] BNB Config: ${JSON.stringify(config)}`);
-
-            // Intentar autenticarse
-            const result = await this.bnbService.authenticate();
-
+            const initialNotification = await this.externalApiService.createInitialNotification(dataPayment, client.id, totalAmount)
+            this.externalApiService.processPaymentNotificationConnector(dataPayment, client.id, requestId, initialNotification.id).catch((error) => {
+                this.logger.error(`[${requestId}] Error en procesamiento async: ${error.message}`);
+            });
             return {
                 success: true,
-                message: 'Conexión exitosa con BNB',
-                requestId,
-                config,
-                tokenReceived: !!result,
-                tokenPreview: result?.substring(0, 20) + '...',
-            };
+                message: "OK"
+            }
         } catch (error) {
-            this.logger.error(`[${requestId}] BNB test failed: ${error.message}`);
-
+            this.logger.error(`[${requestId}] Error al recibir la notificacion: ${error.message}`);
             return {
                 success: false,
-                message: 'Error conectando con BNB',
-                requestId,
-                error: error.message,
-                config: {
-                    url: this.configService.get('BNB_API_URL'),
-                    accountIdConfigured: !!this.configService.get('BNB_ACCOUNT_ID'),
-                    authIdConfigured: !!this.configService.get('BNB_AUTH_ID'),
-                },
-            };
+                message: `Error al recibir la notificacion: ${error.message}`
+            }
         }
     }
 

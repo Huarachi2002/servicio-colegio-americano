@@ -19,6 +19,7 @@ import { CustomLoggerService } from 'src/common/logger';
 import { PaymentNotificationRequest } from 'src/modules/integrations/connector/interfaces/connector.interface';
 import { ConnectorService } from 'src/modules/integrations/connector/services/connector.service';
 import { PaymentPlanResponse } from 'src/modules/integrations/sap/interfaces/payment-plan.interface';
+import { Payment } from 'src/database/entities/payment.entity';
 
 /**
  * Servicio para la API externa (bancos y servicios externos)
@@ -37,6 +38,8 @@ export class ExternalApiService {
         private readonly connectorService: ConnectorService,
         private readonly sapServiceLayerService: SapServiceLayerService,
         private readonly configService: ConfigService,
+        @InjectRepository(Payment)
+        private readonly paymentRepo: Repository<Payment>,
         private readonly customLogger: CustomLoggerService,
     ) {
         this.logger = this.customLogger.setContext(ExternalApiService.name);
@@ -592,6 +595,69 @@ export class ExternalApiService {
                 break;
         }
         return cuentaContableSap;
+    }
+
+    async getPaymentInformationByQr(qrId: string): Promise<PaymentNotificationDto | null> {
+        this.logger.logIntegrationProcess('EXTERNAL_API', 'getPaymentInformationByQr', 'START', { qrId });
+        try {
+            const payment = await this.paymentRepo.findOneBy({ paymentId: qrId });
+            if (!payment) {
+                this.logger.logIntegrationProcess('EXTERNAL_API', 'getPaymentInformationByQr', 'ERROR', { qrId });
+                return null;
+            }
+
+            this.logger.log(`Information Payment Local: ${payment.data}`);
+            const data: PaymentPlanResponse = JSON.parse(payment.data);
+            const erp_code = payment.erpCode;
+
+            const dto = this.transformationPaymentToPaymentNotification(qrId, erp_code, data);
+
+            this.logger.logIntegrationProcess('EXTERNAL_API', 'getPaymentInformationByQr', 'SUCCESS', { qrId });
+            return dto;
+        } catch (error) {
+            this.logger.error(`Error getting payment information by qrId: ${error.message}`);
+            this.logger.logIntegrationProcess('EXTERNAL_API', 'getPaymentInformationByQr', 'ERROR', { qrId, error });
+            throw error;
+        }
+    }
+
+    private transformationPaymentToPaymentNotification(qrId: string, erp_code: string, payment: PaymentPlanResponse): PaymentNotificationDto {
+        const studentMap = new Map<string, any>();
+
+        payment.cuotas.forEach(cuota => {
+            cuota.cuotaDetalle.forEach(detalle => {
+                const code = detalle.codigoEstudiante;
+
+                if (!studentMap.has(code)) {
+                    studentMap.set(code, {
+                        studentCode: code,
+                        orderLines: []
+                    });
+                }
+
+                // Agregamos la nueva línea a sus orderLines
+                studentMap.get(code).orderLines.push({
+                    orderDocEntry: detalle.idTransaccion,
+                    lineNum: detalle.linNum,
+                    amount: detalle.montoDeuda,
+                });
+            });
+        });
+
+        const students = Array.from(studentMap.values());
+
+        return {
+            transactionId: qrId,
+            parentCardCode: erp_code,
+            currency: payment.moneda,
+            paymentDate: new Date().toISOString(),
+            receiptNumber: '',
+            email: '',
+            nroFactura: '',
+            cuf: '',
+            paymentMethod: 2,
+            students: students,
+        };
     }
 
     /**

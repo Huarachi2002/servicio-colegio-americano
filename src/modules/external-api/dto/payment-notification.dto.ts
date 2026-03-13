@@ -38,10 +38,10 @@ export class PaymentNotificationDto {
     cuf?: string;  // Código Único de Factura
 
     @IsNumber()
-    paymentMethod: number;  // Método de pago SIN (1=QR, 2=Tarjeta, etc.)
+    paymentMethod: number;  // Método de pago SIN (2=QR, 1=Tarjeta credito/debito, etc.)
 
     @IsArray()
-    @ArrayMinSize(1, {message: 'Debe incluir al menos un estudiante'})
+    @ArrayMinSize(1, { message: 'Debe incluir al menos un estudiante' })
     @ValidateNested({ each: true })
     @Type(() => StudentPaymentDetail)
     students: StudentPaymentDetail[];  // Estudiantes con sus líneas a pagar
@@ -56,7 +56,7 @@ export class StudentPaymentDetail {
     studentCode: string;  // CntctCode del estudiante
 
     @IsArray()
-    @ArrayMinSize(1, {message: 'Debe incluir al menos una línea de orden'})
+    @ArrayMinSize(1, { message: 'Debe incluir al menos una línea de orden' })
     @ValidateNested({ each: true })
     @Type(() => OrderLineDto)
     orderLines: OrderLineDto[];  // Líneas de orden a facturar
@@ -66,16 +66,16 @@ export class StudentPaymentDetail {
  * DTO para líneas de orden de venta
  */
 export class OrderLineDto {
-    @IsNumber({}, {message: 'orderDocEntry debe ser un número'})
-    @IsNotEmpty({message: 'orderDocEntry es obligatorio'})
+    @IsNumber({}, { message: 'orderDocEntry debe ser un número' })
+    @IsNotEmpty({ message: 'orderDocEntry es obligatorio' })
     orderDocEntry: number;  // DocEntry de ORDR (idTransaccion)
 
-    @IsNumber({}, {message: 'lineNum debe ser un número'})
-    @IsNotEmpty({message: 'lineNum es obligatorio'})
+    @IsNumber({}, { message: 'lineNum debe ser un número' })
+    @IsNotEmpty({ message: 'lineNum es obligatorio' })
     lineNum: number;  // LineNum en RDR1
 
-    @IsNumber({}, {message: 'amount debe ser un número'})
-    @IsNotEmpty({message: 'amount es obligatorio'})
+    @IsNumber({}, { message: 'amount debe ser un número' })
+    @IsNotEmpty({ message: 'amount es obligatorio' })
     amount: number;  // Amount en RDR1
 }
 
@@ -99,7 +99,7 @@ export function getStudentCodesString(students: StudentPaymentDetail[]): string 
  */
 export function generatePaymentFingerprint(dto: PaymentNotificationDto, totalAmount: number): string {
     const crypto = require('crypto');
-    
+
     // Ordenar students y orderLines para consistencia
     const sortedStudents = [...dto.students].sort((a, b) => a.studentCode.localeCompare(b.studentCode));
     const orderLinesStr = sortedStudents
@@ -109,7 +109,7 @@ export function generatePaymentFingerprint(dto: PaymentNotificationDto, totalAmo
             .join('|')
         )
         .join('||');
-    
+
     const fingerprintData = [
         dto.parentCardCode,
         dto.paymentDate,
@@ -117,7 +117,7 @@ export function generatePaymentFingerprint(dto: PaymentNotificationDto, totalAmo
         dto.currency,
         orderLinesStr,
     ].join(':');
-    
+
     return crypto.createHash('sha256').update(fingerprintData).digest('hex');
 }
 

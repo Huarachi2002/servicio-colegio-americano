@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment } from '../../../database/entities/payment.entity';
-import { ExchangeRate } from '../../../database/entities/exchange-rate.entity';
 import { BnbService } from 'src/modules/external-api/services/bnb.service';
 import { CustomLoggerService } from 'src/common/logger';
 import { GenerateQrDto } from '../dto/generate-qr.dto';
@@ -16,16 +15,10 @@ import { PaymentDataInterface, PaymentDataSaveInterface } from '../interface/pay
 @Injectable()
 export class PaymentService {
     private readonly logger: CustomLoggerService;
-    private authToken: {
-        token: string;
-        datetime: Date;
-    } | null = null;
 
     constructor(
         @InjectRepository(Payment)
         private readonly paymentRepository: Repository<Payment>,
-        @InjectRepository(ExchangeRate)
-        private readonly exchangeRateRepository: Repository<ExchangeRate>,
         private readonly bnbService: BnbService,
         private readonly bgService: BgService,
         private readonly customLogger: CustomLoggerService,
