@@ -35,22 +35,33 @@ export class PaymentService {
 
         const { bank_name, erp_code, payment_information } = dataPayment;
 
-        this.logger.logPaymentTransaction(erp_code, 'savePaymentInformation', 'INITIATED', {
-            erpCode: erp_code,
-            amount: payment_information.amount
-        });
-
         this.logger.log(`savePaymentInformation called for erpCode: ${erp_code}`);
         this.logger.debug(`Debt information: ${JSON.stringify(payment_information)}`);
 
-        // Concatenar IDs de transacción y el LinNum para generar un transactionId único 
-        const transactionId = payment_information.students
-            .flatMap(s => s.orderLines)
-            .map(ol => `${ol.idTransaccion}-${ol.lineNum}`)
-            .sort()
-            .join('|');
+        let transactionId: string;
 
         try {
+            this.logger.logPaymentTransaction(erp_code, 'savePaymentInformation', 'INITIATED', {
+                erpCode: erp_code,
+                amount: payment_information?.amount
+            });
+
+            // Validar que students exista y sea un array válido
+            if (!payment_information?.students || !Array.isArray(payment_information.students) || payment_information.students.length === 0) {
+                this.logger.error(`payment_information.students is missing or empty for erpCode: ${erp_code}`);
+                this.logger.error(`payment_information received: ${JSON.stringify(payment_information)}`);
+                return null;
+            }
+
+            // Concatenar IDs de transacción y el LinNum para generar un transactionId único 
+            transactionId = payment_information.students
+                .flatMap(s => s.orderLines)
+                .map(ol => `${ol.idTransaccion}-${ol.lineNum}`)
+                .sort()
+                .join('|');
+
+            this.logger.debug(`Generated transactionId: ${transactionId}`);
+
             const now = new Date();
             now.setHours(0, 0, 0, 0);
 
