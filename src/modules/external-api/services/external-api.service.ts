@@ -621,7 +621,7 @@ export class ExternalApiService {
         }
     }
 
-    private transformationPaymentToPaymentNotification(qrId: string, erp_code: string, payment: PaymentPlanResponse): PaymentNotificationDto {
+    public transformationPaymentToPaymentNotification(idPaymentNotify: string, erp_code: string, payment: PaymentPlanResponse): PaymentNotificationDto {
         const studentMap = new Map<string, any>();
 
         payment.cuotas.forEach(cuota => {
@@ -637,9 +637,9 @@ export class ExternalApiService {
 
                 // Agregamos la nueva línea a sus orderLines
                 studentMap.get(code).orderLines.push({
-                    orderDocEntry: detalle.idTransaccion,
-                    lineNum: detalle.linNum,
-                    amount: detalle.montoDeuda,
+                    orderDocEntry: Number(detalle.idTransaccion),
+                    lineNum: Number(detalle.linNum),
+                    amount: Number(detalle.montoDeuda),
                 });
             });
         });
@@ -647,7 +647,7 @@ export class ExternalApiService {
         const students = Array.from(studentMap.values());
 
         return {
-            transactionId: qrId,
+            transactionId: idPaymentNotify,
             parentCardCode: erp_code,
             currency: payment.moneda,
             paymentDate: new Date().toISOString(),

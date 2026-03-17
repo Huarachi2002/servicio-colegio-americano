@@ -36,7 +36,7 @@ export class PaymentService {
         const { bank_name, erp_code, payment_information } = dataPayment;
 
         this.logger.log(`savePaymentInformation called for erpCode: ${erp_code}`);
-        this.logger.debug(`Debt information: ${JSON.stringify(payment_information)}`);
+        this.logger.log(`Debt information: ${JSON.stringify(payment_information)}`);
 
         let transactionId: string;
 

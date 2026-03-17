@@ -15,6 +15,8 @@ import { ExternalApiService } from '../services/external-api.service';
 import { PaymentNotificationDto } from '../dto/payment-notification.dto';
 import { ExternalApiResponse } from '../interfaces/external-api-response.interface';
 import { ReceiveNotificationBnbDto } from '../dto/receive-notificaction-bnb.dto';
+import { PaymentNotifyLukaDto } from '../dto/payment-notify-luka.dto';
+import { PaymentPlanResponse } from 'src/modules/integrations/sap/interfaces/payment-plan.interface';
 
 @Controller('external')
 @UseGuards(ApiKeyAuthGuard)
@@ -137,6 +139,104 @@ export class ExternalApiController {
         } catch (error) {
             this.logger.error(`[${requestId}] Error: ${error.message}`);
             return this.createResponse(requestId, false, 'ERROR', 'Error interno', null);
+        }
+    }
+
+    @Post('notify_payment')
+    async notifyPaymentLuka(
+        @Body() dto: PaymentNotifyLukaDto,
+        @CurrentApiClient() client: ApiClient,
+    ): Promise<ExternalApiResponse<any>> {
+        const requestId = this.externalApiService.generateRequestId();
+        this.logger.log(`[${requestId}] ${client.name} - Notificación de pago recibida: ${dto.cuotas}`)
+        try {
+            const { idPaymentNotify, parentCardCode, cuotas } = dto;
+            if (!cuotas || cuotas.length === 0) {
+                return this.createResponse(requestId, false, 'INVALID_DATA', 'Debe incluir al menos una cuota', null);
+            }
+
+            let existingNotification = null
+
+            if (idPaymentNotify && idPaymentNotify.trim() !== '') {
+                existingNotification = await this.externalApiService.checkExistingNotification(idPaymentNotify);
+            }
+
+            if (existingNotification) {
+                this.logger.log(`[${requestId}] Pago ya procesado: ${idPaymentNotify}`)
+                return this.createResponse(requestId, true, 'ALREADY_PROCESSED', 'Pago ya procesado', existingNotification);
+            }
+
+
+            let totalAmount = 0;
+            cuotas.forEach(cuota => {
+                totalAmount += parseFloat(cuota.montoCuota);
+            })
+
+            const paymentPlan: PaymentPlanResponse = {
+                nombreDeudor: '',
+                moneda: '',
+                nit: '',
+                razonSocial: '',
+                cuotas: cuotas.map(cuota => {
+                    return {
+                        numeroCuota: cuota.numeroCuota,
+                        montoCuota: cuota.montoCuota,
+                        fechaVencimiento: cuota.fechaVencimiento,
+                        periodo: cuota.periodo,
+                        cuotaDetalle: cuota.cuotaDetalle.map(detalle => {
+                            return {
+                                nombreEstudiante: detalle.nombreEstudiante,
+                                codigoEstudiante: detalle.codigoEstudiante,
+                                idTransaccion: detalle.idTransaccion,
+                                linNum: detalle.linNum,
+                                conceptoDeuda: '',
+                                descuentoDeuda: '',
+                                multaDeuda: '',
+                                montoDeuda: detalle.montoDeuda,
+                            }
+                        })
+                    }
+                })
+            }
+
+            const paymentNotification = this.externalApiService.transformationPaymentToPaymentNotification(
+                idPaymentNotify,
+                parentCardCode,
+                paymentPlan
+            )
+
+            const initialNotification = await this.externalApiService.createInitialNotification(
+                paymentNotification,
+                client.id,
+                totalAmount
+            )
+
+            this.externalApiService.processPaymentNotificationConnector(paymentNotification, client.id, requestId, initialNotification.id).catch((error) => {
+                this.logger.error(`[${requestId}] Error en procesamiento async: ${error.message}`);
+            });
+
+            return this.createResponse(
+                requestId,
+                true,
+                'OK',
+                'Pago recibido.',
+                {
+                    internalId: initialNotification.id,
+                    transactionId: paymentNotification.transactionId,
+                    parentCardCode: paymentNotification.parentCardCode,
+                    totalAmount,
+                },
+            );
+
+        } catch (error) {
+            this.logger.error(`[${requestId}] Error al recibir la notificacion: ${error.message}`);
+            return this.createResponse(
+                requestId,
+                false,
+                'ERROR',
+                `Error al recibir la notificacion: ${error.message}`,
+                null
+            );
         }
     }
 
