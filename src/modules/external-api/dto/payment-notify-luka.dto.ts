@@ -3,8 +3,8 @@ import { Type } from 'class-transformer';
 
 export class PaymentNotifyLukaDto {
     @IsString()
-    @IsNotEmpty()
-    idPaymentNotify: string;
+    @IsOptional()
+    idPaymentNotify?: string;
 
     @IsString()
     @IsNotEmpty()

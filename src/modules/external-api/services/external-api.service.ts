@@ -621,6 +621,8 @@ export class ExternalApiService {
         }
     }
 
+    // TODO: Ver para el caso de Luka si sera siempre por QR o por tarjeta
+
     public transformationPaymentToPaymentNotification(idPaymentNotify: string, erp_code: string, payment: PaymentPlanResponse): PaymentNotificationDto {
         const studentMap = new Map<string, any>();
 
