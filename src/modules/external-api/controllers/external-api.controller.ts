@@ -174,7 +174,7 @@ export class ExternalApiController {
 
             const paymentPlan: PaymentPlanResponse = {
                 nombreDeudor: '',
-                moneda: '',
+                moneda: 'BOB',
                 nit: '',
                 razonSocial: '',
                 cuotas: cuotas.map(cuota => {
