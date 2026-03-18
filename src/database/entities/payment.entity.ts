@@ -17,7 +17,7 @@ export class Payment {
     @Column({ name: 'payment_id' })
     paymentId: string;
 
-    @Column({ name: 'expiration_date', type: 'date' })
+    @Column({ name: 'expiration_date', type: 'datetime' })
     expirationDate: Date;
 
     @Column({ type: 'text' })

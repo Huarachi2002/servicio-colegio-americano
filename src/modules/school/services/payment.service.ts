@@ -77,9 +77,11 @@ export class PaymentService {
 
             // Si no existe, crear nuevo
             if (existingPayment) {
-                // Verificar si el QR ya expiro
-                if (existingPayment.expirationDate < new Date()) {
-                    this.logger.log(`Existing payment for ${erp_code} has expired, creating new one`);
+                const timeWithBuffer = new Date();
+                timeWithBuffer.setMinutes(timeWithBuffer.getMinutes() + 5);
+
+                if (existingPayment.expirationDate < timeWithBuffer) {
+                    this.logger.log(`Existing payment for ${erp_code} has expired or will expire soon, creating new one`);
                     await this.paymentRepository.delete({ paymentId: existingPayment.paymentId });
 
                     const newQr = await this.generateQr({
@@ -120,7 +122,8 @@ export class PaymentService {
                 error: error.message,
                 stack: error.stack,
             });
-            return null;
+            // Propagamos la excpeción en lugar de tragarla para que el controlador (y el usuario) vean el problema
+            throw error;
         }
     }
 
@@ -163,9 +166,21 @@ export class PaymentService {
         try {
             this.logger.log(`No existing payment found for ${erp_code}, creating new one`);
 
+            // Cálculo de expiración exacto para la BD (Mañana justo antes de medianoche)
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
-            const expirationDate = tomorrow.toISOString().split('T')[0];
+            tomorrow.setHours(23, 59, 59, 999);
+
+            // ISO string completo (con horas) para garantizar precisión con Zonas Horarias al grabar localmente
+            const dbExpirationDate = tomorrow.toISOString();
+
+            // Formatear las fechas como los bancos exigen a nivel texto
+            const year = tomorrow.getFullYear();
+            const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+            const day = String(tomorrow.getDate()).padStart(2, '0');
+
+            const bnbExpirationDate = `${year}-${month}-${day}`; // Formato: YYYY-MM-DD
+            const bgExpirationDate = `${day}${month}${year}`;    // Formato: ddmmyyyy
 
             if (!/^\d+$/.test(nit)) {
                 this.logger.warn(`Invalid NIT format: ${nit}`);
@@ -184,24 +199,33 @@ export class PaymentService {
 
             this.logger.logPaymentTransaction(transactionId, 'generateQR', 'PROCESSING', {
                 amount,
-                expirationDate,
+                dbExpirationDate,
+                bnbExpirationDate,
+                bgExpirationDate
             });
 
-            var qrResponse = null
-            const payloadQr = {
-                additionalData,
-                amount,
-                gloss: `${erp_code}, ${payment_information.cuotas} Mensualidad`,
-                expirationDate,
-            }
+            var qrResponse = null;
+
             switch (bank_name) {
                 case 'BNB':
-                    qrResponse = await this.bnbService.generateQR(payloadQr)
+                    const payloadQrBnb = {
+                        additionalData,
+                        amount,
+                        gloss: `${erp_code}, ${payment_information.cuotas} Mensualidad`,
+                        expirationDate: bnbExpirationDate,
+                    };
+                    qrResponse = await this.bnbService.generateQR(payloadQrBnb);
                     break;
 
                 case 'BG':
-                    qrResponse = await this.bgService.generateQR(payloadQr)
-                    break
+                    const payloadQrBg = {
+                        additionalData,
+                        amount,
+                        gloss: `${erp_code}, ${payment_information.cuotas} Mensualidad`,
+                        expirationDate: bgExpirationDate,
+                    };
+                    qrResponse = await this.bgService.generateQR(payloadQrBg);
+                    break;
 
                 default:
                     throw new Error(`Bank not found: ${bank_name}`);
@@ -216,7 +240,7 @@ export class PaymentService {
                     erp_code,
                     transactionId,
                     qrId: qrResponse.qrId,
-                    expirationDate,
+                    expirationDate: dbExpirationDate,
                     data: JSON.stringify(payment_information),
                     qrImage: qrResponse.qrImage,
                     createdBy: bank_name
@@ -232,7 +256,7 @@ export class PaymentService {
             }
         } catch (error) {
             this.logger.error('Error generating QR:', error);
-            return null;
+            throw error;
         }
     }
 }
